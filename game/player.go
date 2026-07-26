@@ -6,7 +6,22 @@ const (
 	playerH = 15
 
 	gravity = 0.22
-	jumpVel = -3.6
+
+	// Jump velocity. The original tweaks it by the current scroll speed
+	// (INIITAL_JUMP_VELOCITY - speed/10), so a faster run jumps a little
+	// higher and the airborne window does not shrink in distance as the
+	// ground rushes by; jumpVelPerSpeed is that term scaled to this
+	// game's speed range.
+	jumpVel         = -3.6
+	jumpVelPerSpeed = -0.134
+
+	// Letting go of the button mid-rise caps the rest of the climb at
+	// dropVel, which is what makes a tap a short hop and a held press a
+	// full jump. The cut only applies once the player has risen
+	// minJumpHeight, so even the shortest hop clears a small cactus.
+	// Ported from the original's endJump/DROP_VELOCITY/MIN_JUMP_HEIGHT.
+	dropVel       = -1.7
+	minJumpHeight = 9.4
 
 	// playerStandY is the player's top edge when standing on the ground.
 	playerStandY = groundY - playerH
@@ -27,10 +42,20 @@ func (p *Player) onGround() bool {
 	return p.y >= playerStandY && p.velY >= 0
 }
 
-// Update advances the player physics by one frame.
-func (p *Player) Update(jumpPressed bool) {
-	if jumpPressed && p.onGround() {
-		p.velY = jumpVel
+// Update advances the player physics by one frame. pressed is the
+// press edge and held whether the button is still down; speed is the
+// current scroll speed, which the jump velocity leans on.
+func (p *Player) Update(pressed, held bool, speed float64) {
+	if pressed && p.onGround() {
+		p.velY = jumpVel + jumpVelPerSpeed*speed
+	}
+	// Cut the rise short once the button is up. Checking the button
+	// state every frame rather than only on the release edge keeps a
+	// release below minJumpHeight from silently becoming a full jump,
+	// which matters on the firmware: it samples input at ~31Hz, so the
+	// shortest press it can report is already two game frames long.
+	if !held && p.velY < dropVel && playerStandY-p.y >= minJumpHeight {
+		p.velY = dropVel
 	}
 	p.velY += gravity
 	p.y += p.velY

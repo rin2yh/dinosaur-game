@@ -3,9 +3,12 @@ package game
 import "testing"
 
 // newRun creates a game and starts a run (skips the title screen).
+// The button is released again on the way out, so the next press a
+// test makes is an edge the game will act on.
 func newRun(seed uint32) *Game {
 	g := New(seed)
 	g.Update(true)
+	g.Update(false)
 	return g
 }
 
@@ -56,6 +59,42 @@ func TestPlayerJumpAndLand(t *testing.T) {
 	}
 	if !landed {
 		t.Fatalf("player never landed; y=%v", g.player.y)
+	}
+}
+
+// TestJumpHeightFollowsHold is the guard on the ported variable-height
+// jump: how long the button stays down has to decide how high and how
+// long the player flies, or the tight late-game gaps have no answer.
+func TestJumpHeightFollowsHold(t *testing.T) {
+	fly := func(hold int) (peak float64, frames int) {
+		g := newRun(1)
+		peak = playerStandY
+		for f := range 200 {
+			g.enemies = g.enemies[:0]
+			g.spawnIn = ScreenWidth * 4
+			g.Update(press(f, 0, hold))
+			peak = min(peak, g.player.y)
+			if !g.player.onGround() {
+				frames++
+			} else if frames > 0 {
+				break
+			}
+		}
+		return playerStandY - peak, frames
+	}
+
+	tapH, tapF := fly(2)
+	holdH, holdF := fly(40)
+	if tapH < minJumpHeight {
+		t.Errorf("the shortest press rises %.1fpx, below the %.1fpx floor", tapH, minJumpHeight)
+	}
+	if tapH >= holdH || tapF >= holdF {
+		t.Errorf("holding did not buy a bigger jump: tap %.1fpx/%df, hold %.1fpx/%df",
+			tapH, tapF, holdH, holdF)
+	}
+	// A tap has to stay useful, or the cut is a trap rather than a tool.
+	if _, _, _, h := newEnemy(cactusSmall, 0).Rect(); tapH < float64(h) {
+		t.Errorf("the shortest press rises %.1fpx, not enough for a %dpx cactus", tapH, h)
 	}
 }
 
@@ -160,25 +199,38 @@ func TestScoreAndSpeedIncrease(t *testing.T) {
 	}
 }
 
+// holds are the button hold lengths the timing searches try: the
+// shortest press the firmware can express, a human tap, and a hold
+// long enough to never be cut short.
+var holds = []int{2, 6, 12, 40}
+
+// press reports whether the button is down on frame f for a press that
+// starts on frame start and is held for hold frames.
+func press(f, start, hold int) bool {
+	return f >= start && f < start+hold
+}
+
 // clearable reports whether an enemy of the given kind can be jumped
 // over (or survived by staying grounded) at the given speed with at
 // least one jump timing.
 func clearable(kind enemyKind, speed float64) bool {
-	for delay := range 120 {
-		g := newRun(1)
-		g.speed = speed
-		g.enemies = append(g.enemies, newEnemy(kind, spawnX(kind)))
-		survived := true
-		for f := 0; len(g.enemies) > 0; f++ {
-			g.spawnIn = ScreenWidth * 2 // suppress further spawns
-			g.Update(f == delay)
-			if g.Mode() == ModeGameOver {
-				survived = false
-				break
+	for _, hold := range holds {
+		for delay := range 120 {
+			g := newRun(1)
+			g.speed = speed
+			g.enemies = append(g.enemies, newEnemy(kind, ScreenWidth))
+			survived := true
+			for f := 0; len(g.enemies) > 0; f++ {
+				g.spawnIn = ScreenWidth * 2 // suppress further spawns
+				g.Update(press(f, delay, hold))
+				if g.Mode() == ModeGameOver {
+					survived = false
+					break
+				}
 			}
-		}
-		if survived {
-			return true
+			if survived {
+				return true
+			}
 		}
 	}
 	return false
@@ -206,15 +258,17 @@ func TestEnemiesClearableAtUnlockScore(t *testing.T) {
 }
 
 // pairSurvives simulates two consecutive enemies spawned gap pixels
-// apart with jump presses on frames d1 and d2.
-func pairSurvives(k1, k2 enemyKind, speed, gap float64, d1, d2 int) bool {
+// apart, with the button pressed on frames d1 and d2 and held for h1
+// and h2 frames. d2 <= d1 means a single press covers both, which is
+// how the tightest gaps have to be cleared.
+func pairSurvives(k1, k2 enemyKind, speed, gap float64, d1, h1, d2, h2 int) bool {
 	g := newRun(1)
 	g.speed = speed
 	g.enemies = append(g.enemies,
-		newEnemy(k1, spawnX(k1)), newEnemy(k2, spawnX(k2)+gap))
+		newEnemy(k1, ScreenWidth), newEnemy(k2, ScreenWidth+gap))
 	for f := 0; len(g.enemies) > 0; f++ {
 		g.spawnIn = ScreenWidth * 4 // suppress further spawns
-		g.Update(f == d1 || f == d2)
+		g.Update(press(f, d1, h1) || press(f, d2, h2))
 		if g.Mode() == ModeGameOver {
 			return false
 		}
@@ -225,18 +279,23 @@ func pairSurvives(k1, k2 enemyKind, speed, gap float64, d1, d2 int) bool {
 // pairRobust reports whether some pair of jump timings survives even
 // when both presses are off by up to r frames in any combination —
 // i.e. the pair is clearable with human-scale timing tolerance, not
-// just frame-perfectly.
+// just frame-perfectly. Clearing both with one press counts, and is
+// the only answer once the gap is shorter than a jump.
 func pairRobust(k1, k2 enemyKind, speed, gap float64, r int) bool {
-	for d1 := range 70 {
-		for d2 := d1 + 10; d2 < d1+110; d2++ {
-			ok := true
-			for i := -r; i <= r && ok; i++ {
-				for j := -r; j <= r && ok; j++ {
-					ok = pairSurvives(k1, k2, speed, gap, d1+i, d2+j)
+	for _, h1 := range holds {
+		for _, h2 := range holds {
+			for d1 := range 70 {
+				for d2 := d1; d2 < d1+110; d2++ {
+					ok := true
+					for i := -r; i <= r && ok; i++ {
+						for j := -r; j <= r && ok; j++ {
+							ok = pairSurvives(k1, k2, speed, gap, d1+i, h1, d2+j, h2)
+						}
+					}
+					if ok {
+						return true
+					}
 				}
-			}
-			if ok {
-				return true
 			}
 		}
 	}
@@ -258,22 +317,26 @@ func TestEnemyTableUnlocksSorted(t *testing.T) {
 // there a pair must be clearable with at least ±5 frames (~83ms) of
 // slack on both jumps.
 func TestBackToBackEnemiesClearableAtPeakDifficulty(t *testing.T) {
-	minGap := minSpawnGap(maxSpeed, 1)
 	pairs := []struct {
 		name   string
 		k1, k2 enemyKind
 	}{
 		{"birdLow->cactusSmall", birdLow, cactusSmall},
 		{"cactusSmall->cactusSmall", cactusSmall, cactusSmall},
+		{"cactusSmall->cactusBig", cactusSmall, cactusBig},
 		{"cactusDouble->cactusSmall", cactusDouble, cactusSmall},
 		{"cactusTriple->cactusSmall", cactusTriple, cactusSmall},
 		{"cactusSmall->cactusTriple", cactusSmall, cactusTriple},
-		{"birdFast->cactusSmall", birdFast, cactusSmall},
-		{"cactusSmall->birdFast", cactusSmall, birdFast},
+		{"cactusSmall->birdLow", cactusSmall, birdLow},
 	}
 	for _, p := range pairs {
-		if !pairRobust(p.k1, p.k2, maxSpeed, minGap, 5) {
-			t.Errorf("%s needs tighter than ±5 frame timing at peak difficulty with min gap %.0fpx", p.name, minGap)
+		// The gap the leading enemy earns, measured tail to nose the
+		// way spawn() lays it out, at its tightest: max speed, peak
+		// difficulty, no random stretch.
+		_, _, w, _ := newEnemy(p.k1, 0).Rect()
+		gap := float64(w) + minSpawnGap(w, maxSpeed, 1)
+		if !pairRobust(p.k1, p.k2, maxSpeed, gap, 5) {
+			t.Errorf("%s needs tighter than ±5 frame timing at peak difficulty with min gap %.0fpx", p.name, gap)
 		}
 	}
 }
@@ -292,9 +355,13 @@ func TestDifficultyKeepsRisingPastMaxSpeed(t *testing.T) {
 	}
 
 	// Between the speed cap and the difficulty peak, enemies must
-	// still be arriving measurably closer together.
-	early := minSpawnGap(maxSpeed, float64(flat)/difficultyPeak) + float64(spawnGapJitter(float64(flat)/difficultyPeak))
-	late := minSpawnGap(maxSpeed, 1) + float64(spawnGapJitter(1))
+	// still be arriving measurably closer together — both the floor
+	// and the widest the random stretch can make it.
+	const w = 8 // a small cactus, the most common enemy
+	worst := func(diff float64) float64 {
+		return minSpawnGap(w, maxSpeed, diff) * lerp(gapJitterEasy, gapJitterHard, diff)
+	}
+	early, late := worst(float64(flat)/difficultyPeak), worst(1)
 	if late >= early {
 		t.Errorf("worst-case spawn gap did not tighten after the speed cap: %.0fpx -> %.0fpx", early, late)
 	}

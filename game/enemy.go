@@ -24,7 +24,6 @@ const (
 	birdLow      // must jump over
 	birdHigh     // must run under (jumping hits it)
 	cactusTriple // widest ground obstacle
-	birdFast     // low bird that outruns the scroll
 )
 
 // enemyTable holds each kind's unlock score and constructor, indexed
@@ -42,7 +41,6 @@ var enemyTable = [...]struct {
 	birdLow:      {450, func(x float64) Enemy { return &bird{x: x} }},
 	birdHigh:     {450, func(x float64) Enemy { return &bird{x: x, high: true} }},
 	cactusTriple: {800, func(x float64) Enemy { return &cactus{x: x, sprite: cactusTripleSprite} }},
-	birdFast:     {1250, func(x float64) Enemy { return &bird{x: x, fast: true} }},
 }
 
 // newEnemy creates an enemy of the given kind with its left edge at x.
@@ -80,42 +78,28 @@ const (
 	birdH         = 6
 	birdFlyHeight = 4 // gap between a low bird and the ground
 
-	// birdFastFactor is how much quicker than the scroll a fast bird
-	// flies. It cuts the time between the bird appearing at the right
-	// edge and reaching the player, so it tests reaction rather than
-	// jump technique.
-	birdFastFactor = 1.25
-
-	// birdFastLead is how far off-screen a fast bird starts. Flying in
-	// quicker means it also gains on whatever is ahead of it, which
-	// would shrink the gap the player gets between the two arrivals.
-	// Starting it back by exactly what it gains on the way in keeps
-	// that gap the one spawn picked, leaving the shorter warning as the
-	// only thing a fast bird changes.
-	birdFastLead = (ScreenWidth - playerX) * (birdFastFactor - 1)
+	// Every bird flies a little off the scroll speed, half of them
+	// faster and half slower, as the original's pterodactyls do with
+	// their speedOffset. A fast one gives less warning than anything
+	// else in the game; a slow one drifts back into the gap behind it.
+	// Kept as a fraction of the scroll rather than the original's flat
+	// px/frame so it stays the same 12% at either end of the speed
+	// range, which is about where the original's lands.
+	birdSpeedOffset = 0.12
 )
 
-// spawnX returns the world x an enemy of the given kind enters at.
-func spawnX(kind enemyKind) float64 {
-	if kind == birdFast {
-		return ScreenWidth + birdFastLead
-	}
-	return ScreenWidth
-}
-
 // bird is a flying obstacle. Low birds must be jumped over; high
-// birds fly at head height and must be run under.
+// birds fly at head height and must be run under. offset is the
+// fraction of the scroll speed this bird flies faster (or, negative,
+// slower) than the ground.
 type bird struct {
-	x    float64
-	high bool
-	fast bool
+	x      float64
+	high   bool
+	offset float64
 }
 
 func (b *bird) Update(speed float64) {
-	if b.fast {
-		speed *= birdFastFactor
-	}
-	b.x -= speed
+	b.x -= speed * (1 + b.offset)
 }
 
 func (b *bird) Rect() (x, y, w, h int) {
