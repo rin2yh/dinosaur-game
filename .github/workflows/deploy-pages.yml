@@ -5,11 +5,8 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Least privilege for the deployment: read the repo, publish to Pages.
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+# Deny by default; each job opts into only what it needs.
+permissions: {}
 
 # Let an in-flight deployment finish; queue the next one behind it.
 concurrency:
@@ -19,6 +16,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Only the checkout needs the token; the artifact upload uses the
+    # runner's own credentials.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -35,8 +36,6 @@ jobs:
           GOOS=js GOARCH=wasm go build -o web/game.wasm ./cmd/dinosaur-game
           cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/
 
-      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: web
@@ -44,6 +43,11 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # No checkout here: the deployment only needs to publish and to prove
+    # its origin via OIDC.
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
