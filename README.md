@@ -20,15 +20,19 @@ mise install
 ## ビルドと実行
 
 ```sh
-make run        # デスクトップで実行
-make build-web  # web/ に WASM をビルド
-make serve      # wasmserve で http://localhost:8000 に配信（リロードで再ビルド）
-make check      # fmt + vet + test
+mise run run            # デスクトップで実行
+mise run build-web      # web/ に WASM をビルド
+mise run serve          # wasmserve で http://localhost:8000 に配信（リロードで再ビルド）
+mise run check          # fmt + vet + test + koebiten ビルド
+mise run build-koebiten # zero-kb02 向け UF2 を bin/ にビルド（TinyGo）
+mise run flash-koebiten # zero-kb02 に書き込み
 ```
+
+コマンドの定義は mise.toml の 1 箇所だけです。Makefile は同名ターゲット（`make check` など）を `mise run` に委譲するだけの薄いシムなので、どちらから呼んでも同じものが動きます。
 
 ## 構成と移植性
 
-[sago35/koebiten](https://github.com/sago35/koebiten) への移植を想定し、ゲーム本体をエンジン非依存にしています。
+ゲーム本体はエンジン非依存で、Ebitengine と [sago35/koebiten](https://github.com/sago35/koebiten) の 2 つのフロントエンドがあります。
 
 ```
 game/        エンジン非依存のゲームロジックと描画（Ebitengine に依存しない）
@@ -37,6 +41,8 @@ game/        エンジン非依存のゲームロジックと描画（Ebitengine
   sprites.go 1bit ビットマップスプライト
   font.go    3x5 ピクセルフォント
 main.go      Ebitengine フロントエンド（入力と RGBA フレームバッファのみ）
+koebiten/    koebiten フロントエンド（zero-kb02 などの実機 OLED 向け、TinyGo でビルド）
+targets/     TinyGo のカスタムターゲット定義
 web/         WASM 配信用ファイル
 ```
 
@@ -47,8 +53,13 @@ web/         WASM 配信用ファイル
 - 毎フレーム `Update(jumpPressed bool)` を呼ぶ（60 TPS 想定）
 - 乱数は内蔵 xorshift、`float64` と標準ライブラリ最小限のみ使用（TinyGo で動作可能）
 
-### koebiten への移植手順
+### koebiten フロントエンド
 
-1. koebiten 側の `Game.Update` でジャンプボタンのエッジ検出をして `game.Update` に渡す
-2. `Draw` で `game.Display` を実装した薄いラッパー（koebiten の描画 API へ `SetPixel` を転送）を渡す
-3. `game` パッケージはそのまま利用する
+`koebiten/main.go` が上記の前提をそのまま実装しています。
+
+- 任意のキーの押下エッジをジャンプ入力として `game.Update` に渡す
+- `game.Display` を実装した薄いラッパーが koebiten の `Displayer.SetPixel` へ転送する
+- koebiten v0.5.0 は消灯状態にクリアして点灯ピクセルを描く規約なので、通常時は黒背景に白で描画し、ナイトモードは白で塗り潰してから黒で描いて反転する
+- koebiten は 32ms tick（約 31 TPS）のため、1 tick にゲームを 2 フレーム進めて 60 TPS 前提の速度を維持する
+
+ボードには時計が無く毎回同じ状態で起動するため、乱数シードはランを開始したフレーム（＝プレイヤーの押下タイミング）を `game` 側で混ぜて確保しています。

@@ -1,0 +1,6 @@
+{
+    "inherits": [
+        "waveshare-rp2040-zero"
+    ],
+    "build-tags": ["zero_kb02"]
+}
