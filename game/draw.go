@@ -92,6 +92,21 @@ func drawNumber(d Display, x, y, n int) {
 	}
 }
 
+// screenX converts a world x to the pixel column a sprite starts at.
+// A plain int() conversion truncates toward zero, so both (-1, 0) and
+// [0, 1) land on column 0 and a sprite stalls there for an extra frame
+// — right beside the player, since playerX is 6. Flooring keeps every
+// pixel step evenly timed all the way off the left edge. Hand-rolled
+// rather than math.Floor to keep this package import-free, which the
+// TinyGo firmware build relies on.
+func screenX(x float64) int {
+	i := int(x)
+	if x < 0 && float64(i) != x {
+		i--
+	}
+	return i
+}
+
 func drawSprite(d Display, x, y int, s sprite) {
 	w, h := s.size()
 	for sy := range h {

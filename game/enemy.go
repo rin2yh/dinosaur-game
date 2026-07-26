@@ -56,7 +56,7 @@ func (c *cactus) Update(speed float64) {
 
 func (c *cactus) Rect() (x, y, w, h int) {
 	w, h = c.sprite.size()
-	return int(c.x), groundY - h, w, h
+	return screenX(c.x), groundY - h, w, h
 }
 
 func (c *cactus) Draw(d Display, _ int) {
@@ -91,7 +91,7 @@ func (b *bird) Rect() (x, y, w, h int) {
 	if b.high {
 		y = groundY - playerH - birdH - birdFlyHeight
 	}
-	return int(b.x), y, birdW, birdH
+	return screenX(b.x), y, birdW, birdH
 }
 
 func (b *bird) Draw(d Display, frame int) {

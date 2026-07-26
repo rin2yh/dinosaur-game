@@ -271,6 +271,34 @@ func TestBackToBackEnemiesClearableAtMaxSpeed(t *testing.T) {
 	}
 }
 
+// TestEnemiesScrollEvenlyPastPlayer guards against an enemy visibly
+// stalling as it scrolls past the player and off the left edge, which
+// is what an int() conversion (truncation toward zero) causes at
+// x == 0 — just left of playerX.
+func TestEnemiesScrollEvenlyPastPlayer(t *testing.T) {
+	// Every speed the game runs at moves at least a whole pixel per
+	// frame, so speed is not the free variable here — the sub-pixel
+	// phase an enemy happens to reach the left edge with is. Sweep the
+	// phase at both ends of the speed range, for every kind.
+	for kind := range len(enemyTable) {
+		for _, speed := range []float64{baseSpeed, maxSpeed} {
+			for phase := range 8 {
+				e := newEnemy(enemyKind(kind), 20+float64(phase)/8)
+				prev, _, _, _ := e.Rect()
+				for !e.OffScreen() {
+					e.Update(speed)
+					x, _, _, _ := e.Rect()
+					if step := prev - x; step < 1 {
+						t.Fatalf("enemy kind %d at speed %v phase %d: stalled at x=%d",
+							kind, speed, phase, x)
+					}
+					prev = x
+				}
+			}
+		}
+	}
+}
+
 func TestNightModeTogglesAndReverts(t *testing.T) {
 	g := newPlaying(t)
 	g.score = invertEvery - 1
