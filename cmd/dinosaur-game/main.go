@@ -11,7 +11,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
-	"github.com/yuuki/dinosaur-game/game"
+	"github.com/rin2yh/dinosaur-game/game"
 )
 
 // Chrome dino palette: dark gray on off-white.

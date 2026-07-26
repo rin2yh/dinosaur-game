@@ -17,7 +17,7 @@ import (
 	"github.com/sago35/koebiten/hardware"
 	"tinygo.org/x/drivers/pixel"
 
-	"github.com/yuuki/dinosaur-game/game"
+	"github.com/rin2yh/dinosaur-game/game"
 )
 
 // koebiten v0.5.0 clears the display buffer to all-pixels-off and games
