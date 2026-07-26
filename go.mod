@@ -1,4 +1,4 @@
-module github.com/yuuki/dinosaur-game
+module github.com/rin2yh/dinosaur-game
 
 go 1.25.6
 
