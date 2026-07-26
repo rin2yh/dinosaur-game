@@ -271,6 +271,39 @@ func TestBackToBackEnemiesClearableAtMaxSpeed(t *testing.T) {
 	}
 }
 
+// TestEnemyScrollsEvenlyPastPlayer guards against the enemy visibly
+// stalling as it scrolls past the player and off the left edge, which
+// is what an int() conversion (truncation toward zero) causes at
+// x == 0 — just left of playerX.
+func TestEnemyScrollsEvenlyPastPlayer(t *testing.T) {
+	// Sample the whole speed range and, at each speed, every sub-pixel
+	// phase an enemy can arrive at the left edge with.
+	for _, speed := range []float64{baseSpeed, 1.15, 1.4, 1.55, 1.9, maxSpeed} {
+		for phase := range 16 {
+			e := newEnemy(cactusSmall, 20+float64(phase)/16)
+			prev, _, _, _ := e.Rect()
+			for !e.OffScreen() {
+				e.Update(speed)
+				x, _, _, _ := e.Rect()
+
+				// The sprite must never be drawn to the right of where
+				// it actually is; that lag is the stutter.
+				if float64(x) > e.(*cactus).x {
+					t.Fatalf("speed %v phase %d: drawn at x=%d but true x=%v",
+						speed, phase, x, e.(*cactus).x)
+				}
+				// Every frame must advance by a whole pixel at these
+				// speeds; a zero step is a dropped frame of motion.
+				if step := prev - x; step < 1 {
+					t.Fatalf("speed %v phase %d: stalled at x=%d (step %d)",
+						speed, phase, x, step)
+				}
+				prev = x
+			}
+		}
+	}
+}
+
 func TestNightModeTogglesAndReverts(t *testing.T) {
 	g := newPlaying(t)
 	g.score = invertEvery - 1

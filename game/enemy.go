@@ -44,6 +44,19 @@ func newEnemy(kind enemyKind, x float64) Enemy {
 	return enemyTable[kind].spawn(x)
 }
 
+// screenX converts a world x to the pixel column a sprite starts at.
+// A plain int() conversion truncates toward zero, so both (-1, 0) and
+// [0, 1) land on column 0 and an enemy stalls there for an extra
+// frame — right beside the player, since playerX is 6. Flooring keeps
+// every pixel step evenly timed all the way off the left edge.
+func screenX(x float64) int {
+	i := int(x)
+	if x < 0 && float64(i) != x {
+		i--
+	}
+	return i
+}
+
 // cactus is a ground obstacle; the variants differ only in sprite.
 type cactus struct {
 	x      float64
@@ -56,7 +69,7 @@ func (c *cactus) Update(speed float64) {
 
 func (c *cactus) Rect() (x, y, w, h int) {
 	w, h = c.sprite.size()
-	return int(c.x), groundY - h, w, h
+	return screenX(c.x), groundY - h, w, h
 }
 
 func (c *cactus) Draw(d Display, _ int) {
@@ -91,7 +104,7 @@ func (b *bird) Rect() (x, y, w, h int) {
 	if b.high {
 		y = groundY - playerH - birdH - birdFlyHeight
 	}
-	return int(b.x), y, birdW, birdH
+	return screenX(b.x), y, birdW, birdH
 }
 
 func (b *bird) Draw(d Display, frame int) {
