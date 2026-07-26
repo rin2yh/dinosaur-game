@@ -17,10 +17,14 @@ const (
 	// accel 0.001 px/frame^2 on a 600px canvas). maxSpeed is set so an
 	// enemy crosses this 128px screen in as many frames as one crosses
 	// the original's 600px canvas at its top speed, which is the real
-	// measure of how much reaction time the player gets.
-	baseSpeed = 1.0
+	// measure of how much reaction time the player gets. baseSpeed then
+	// follows from the original's ratio, 13/6: starting slower than that
+	// is what made the opening far gentler than the original's, since a
+	// sprite this size takes proportionally longer to pass the player.
+	// accel completes the ramp in the original's 7000 frames.
+	baseSpeed = 1.29
 	maxSpeed  = 2.8
-	accel     = 0.0002
+	accel     = 0.000216
 
 	scoreEvery = 6 // frames per score point
 
@@ -48,17 +52,18 @@ const (
 	// behind it. The floor is a jump's worth of frames, and the width
 	// only buys the extra room a wide enemy has earned.
 	//
-	// Every term tightens with the difficulty, which is what keeps a run
-	// getting harder after the speed has capped — the original stops
-	// there. The hard ends are pinned by the clearability tests.
-	gapFloorEasy    = 24   // frames of scroll every enemy earns...
-	gapFloorHard    = 16.5 // ...at difficulty 0 and 1
-	gapPerWidthEasy = 2.1  // extra frames earned per px of width...
-	gapPerWidthHard = 1.7  // ...at difficulty 0 and 1
-	gapFlatEasy     = 16   // px of flat breather at difficulty 0
-	gapFlatHard     = 10   // ...and at difficulty 1
-	gapJitterEasy   = 1.5  // gap is stretched by up to this at difficulty 0
-	gapJitterHard   = 1.2  // ...and by up to this at difficulty 1
+	// The three terms are calibrated so the frames between arrivals come
+	// out where the original's do: 38 to 52 at the start against 28 to
+	// 38 at full speed, for the original's 35-49 and 25-37. What is left
+	// of the difficulty ramp only narrows the random stretch, so a long
+	// run meets the tight end more and more often without the floor
+	// itself ever moving — the floor is the original's, and a test pins
+	// it to the tightest pair still clearable with ±3 frames of slop.
+	gapFloor      = 6.4  // frames of scroll every enemy earns
+	gapPerWidth   = 1.65 // extra frames earned per px of width
+	gapFlat       = 16   // px of flat breather
+	gapJitterEasy = 1.5  // gap is stretched by up to this at difficulty 0
+	gapJitterHard = 1.2  // ...and by up to this at difficulty 1
 
 	// The original refuses a third obstacle of the same type in a row
 	// (MAX_OBSTACLE_DUPLICATION), so a run never settles into a
@@ -246,12 +251,9 @@ func (g *Game) difficulty() float64 {
 // minSpawnGap is the smallest gap in pixels an enemy of the given
 // width earns behind it, before the random stretch. Wider enemies earn
 // more, and only that term scales with speed, so the gap shrinks in
-// frames as the run speeds up. The flat term is the breather, and it
-// is what the difficulty keeps taking away after the speed has capped.
-func minSpawnGap(width int, speed, diff float64) float64 {
-	frames := lerp(gapFloorEasy, gapFloorHard, diff) +
-		float64(width)*lerp(gapPerWidthEasy, gapPerWidthHard, diff)
-	return frames*speed + lerp(gapFlatEasy, gapFlatHard, diff)
+// frames as the run speeds up.
+func minSpawnGap(width int, speed float64) float64 {
+	return (gapFloor+float64(width)*gapPerWidth)*speed + gapFlat
 }
 
 // spawnGap is minSpawnGap stretched by a random factor, the original's
@@ -259,7 +261,7 @@ func minSpawnGap(width int, speed, diff float64) float64 {
 // instead of mattering less and less as the gaps grow.
 func (g *Game) spawnGap(width int, diff float64) float64 {
 	stretch := lerp(gapJitterEasy, gapJitterHard, diff)
-	return minSpawnGap(width, g.speed, diff) * (1 + float64(g.rand(101))/100*(stretch-1))
+	return minSpawnGap(width, g.speed) * (1 + float64(g.rand(101))/100*(stretch-1))
 }
 
 // lerp interpolates from easy to hard over t in [0, 1].

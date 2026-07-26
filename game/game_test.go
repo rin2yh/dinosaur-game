@@ -282,10 +282,14 @@ func pairSurvives(k1, k2 enemyKind, speed, gap float64, d1, h1, d2, h2 int) bool
 // just frame-perfectly. Clearing both with one press counts, and is
 // the only answer once the gap is shorter than a jump.
 func pairRobust(k1, k2 enemyKind, speed, gap float64, r int) bool {
+	// The second press has to be searched all the way out to when the
+	// second enemy actually arrives, which at low speed is far later
+	// than any fixed window would reach.
+	span := int(gap/speed) + 60
 	for _, h1 := range holds {
 		for _, h2 := range holds {
 			for d1 := range 70 {
-				for d2 := d1; d2 < d1+110; d2++ {
+				for d2 := d1; d2 < d1+span; d2++ {
 					ok := true
 					for i := -r; i <= r && ok; i++ {
 						for j := -r; j <= r && ok; j++ {
@@ -312,11 +316,17 @@ func TestEnemyTableUnlocksSorted(t *testing.T) {
 	}
 }
 
-// TestBackToBackEnemiesClearableAtPeakDifficulty guards the spawn-gap
-// formula at its tightest: max speed, difficulty 1, no jitter. Even
-// there a pair must be clearable with at least ±5 frames (~83ms) of
-// slack on both jumps.
-func TestBackToBackEnemiesClearableAtPeakDifficulty(t *testing.T) {
+// pairSlack is the timing slop the tightest spawn gap has to leave on
+// every press. The original leaves about this much at its own tightest
+// draw, and this game is calibrated to sit alongside it: asking for
+// more is what made an earlier cut of this noticeably gentler than the
+// original, and asking for less would be trusting frame-perfect play.
+const pairSlack = 3
+
+// TestBackToBackEnemiesClearable guards the spawn-gap formula at its
+// tightest — the minimum gap with no random stretch — at both ends of
+// the speed ramp.
+func TestBackToBackEnemiesClearable(t *testing.T) {
 	pairs := []struct {
 		name   string
 		k1, k2 enemyKind
@@ -324,19 +334,26 @@ func TestBackToBackEnemiesClearableAtPeakDifficulty(t *testing.T) {
 		{"birdLow->cactusSmall", birdLow, cactusSmall},
 		{"cactusSmall->cactusSmall", cactusSmall, cactusSmall},
 		{"cactusSmall->cactusBig", cactusSmall, cactusBig},
+		{"cactusBig->cactusSmall", cactusBig, cactusSmall},
 		{"cactusDouble->cactusSmall", cactusDouble, cactusSmall},
 		{"cactusTriple->cactusSmall", cactusTriple, cactusSmall},
 		{"cactusSmall->cactusTriple", cactusSmall, cactusTriple},
 		{"cactusSmall->birdLow", cactusSmall, birdLow},
 	}
 	for _, p := range pairs {
-		// The gap the leading enemy earns, measured tail to nose the
-		// way spawn() lays it out, at its tightest: max speed, peak
-		// difficulty, no random stretch.
-		_, _, w, _ := newEnemy(p.k1, 0).Rect()
-		gap := float64(w) + minSpawnGap(w, maxSpeed, 1)
-		if !pairRobust(p.k1, p.k2, maxSpeed, gap, 5) {
-			t.Errorf("%s needs tighter than ±5 frame timing at peak difficulty with min gap %.0fpx", p.name, gap)
+		// The slowest the run can be when this pair is possible at all
+		// is the speed at the later of the two unlock scores, and the
+		// gap is at its tightest in frames at max speed. Check both.
+		unlock := max(enemyTable[p.k1].unlock, enemyTable[p.k2].unlock)
+		for _, speed := range []float64{speedAtScore(unlock), maxSpeed} {
+			// The gap the leading enemy earns, measured tail to nose
+			// the way spawn() lays it out, with no random stretch.
+			_, _, w, _ := newEnemy(p.k1, 0).Rect()
+			gap := float64(w) + minSpawnGap(w, speed)
+			if !pairRobust(p.k1, p.k2, speed, gap, pairSlack) {
+				t.Errorf("%s at speed %.2f needs tighter than ±%d frame timing with min gap %.0fpx",
+					p.name, speed, pairSlack, gap)
+			}
 		}
 	}
 }
@@ -359,7 +376,7 @@ func TestDifficultyKeepsRisingPastMaxSpeed(t *testing.T) {
 	// and the widest the random stretch can make it.
 	const w = 8 // a small cactus, the most common enemy
 	worst := func(diff float64) float64 {
-		return minSpawnGap(w, maxSpeed, diff) * lerp(gapJitterEasy, gapJitterHard, diff)
+		return minSpawnGap(w, maxSpeed) * lerp(gapJitterEasy, gapJitterHard, diff)
 	}
 	early, late := worst(float64(flat)/difficultyPeak), worst(1)
 	if late >= early {
