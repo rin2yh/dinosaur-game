@@ -1,9 +1,12 @@
 //go:build tinygo
 
-// Command koebiten is the koebiten frontend for the dinosaur game,
-// targeting boards with a 128x64 1-bit OLED such as zero-kb02. All
-// game logic and rendering live in the engine-agnostic game package;
-// this file only wires up input and the display.
+// Command firmware is the koebiten frontend for the dinosaur game,
+// flashed onto a microcontroller with a 128x64 1-bit OLED such as
+// zero-kb02. koebiten picks the board from a build tag, so supporting
+// another one is a matter of adding a target under targets/ rather than
+// another command. All game logic and rendering live in the
+// engine-agnostic game package; this file only wires up input and the
+// display.
 package main
 
 import (

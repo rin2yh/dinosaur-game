@@ -23,28 +23,31 @@ mise install
 mise run run            # デスクトップで実行
 mise run build-web      # web/ に WASM をビルド
 mise run serve          # wasmserve で http://localhost:8000 に配信（リロードで再ビルド）
-mise run check          # fmt + vet + test + koebiten ビルド
-mise run build-koebiten # zero-kb02 向け UF2 を bin/ にビルド（TinyGo）
-mise run flash-koebiten # zero-kb02 に書き込み
+mise run check          # fmt + vet + test + ファームウェアビルド
+mise run build-firmware # zero-kb02 向け UF2 を bin/ にビルド（TinyGo）
+mise run flash-firmware # zero-kb02 に書き込み
 ```
 
-コマンドの定義は mise.toml の 1 箇所だけです。Makefile は同名ターゲット（`make check` など）を `mise run` に委譲するだけの薄いシムなので、どちらから呼んでも同じものが動きます。
+タスクの一覧と説明は `mise tasks` で確認できます。
 
 ## 構成と移植性
 
 ゲーム本体はエンジン非依存で、Ebitengine と [sago35/koebiten](https://github.com/sago35/koebiten) の 2 つのフロントエンドがあります。
 
 ```
-game/        エンジン非依存のゲームロジックと描画（Ebitengine に依存しない）
-  game.go    状態遷移・物理・障害物・当たり判定・スコア
-  draw.go    Display インターフェースへの描画
-  sprites.go 1bit ビットマップスプライト
-  font.go    3x5 ピクセルフォント
-main.go      Ebitengine フロントエンド（入力と RGBA フレームバッファのみ）
-koebiten/    koebiten フロントエンド（zero-kb02 などの実機 OLED 向け、TinyGo でビルド）
-targets/     TinyGo のカスタムターゲット定義
-web/         WASM 配信用ファイル
+game/            エンジン非依存のゲームロジックと描画（どのエンジンにも依存しない）
+  game.go        状態遷移・物理・障害物・当たり判定・スコア
+  draw.go        Display インターフェースへの描画
+  sprites.go     1bit ビットマップスプライト
+  font.go        3x5 ピクセルフォント
+cmd/
+  dinosaur-game/ Ebitengine フロントエンド（デスクトップと WASM、入力と RGBA フレームバッファのみ）
+  firmware/      koebiten フロントエンド（マイコン実機向け、TinyGo でビルド）
+targets/         TinyGo のカスタムターゲット定義（ボードごとに 1 ファイル）
+web/             WASM 配信用ファイル
 ```
+
+フロントエンドはどちらも `cmd/` 配下の独立した main パッケージで、共有するのは `game` パッケージだけです。ボードの選択は koebiten 側がビルドタグで行うため、対応ボードを増やすときに増えるのは `targets/` の JSON であって `cmd/` ではありません。
 
 `game` パッケージの前提は次のとおりです。
 
@@ -53,9 +56,9 @@ web/         WASM 配信用ファイル
 - 毎フレーム `Update(jumpPressed bool)` を呼ぶ（60 TPS 想定）
 - 乱数は内蔵 xorshift、`float64` と標準ライブラリ最小限のみ使用（TinyGo で動作可能）
 
-### koebiten フロントエンド
+### ファームウェア（koebiten フロントエンド）
 
-`koebiten/main.go` が上記の前提をそのまま実装しています。
+`cmd/firmware/main.go` が上記の前提をそのまま実装しています。
 
 - 任意のキーの押下エッジをジャンプ入力として `game.Update` に渡す
 - `game.Display` を実装した薄いラッパーが koebiten の `Displayer.SetPixel` へ転送する

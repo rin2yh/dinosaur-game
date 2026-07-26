@@ -32,7 +32,7 @@ go.work.sum
 # .vscode/
 
 
-# Build artifacts (see Makefile)
+# Build artifacts (see mise.toml)
 bin/
 web/game.wasm
 web/wasm_exec.js
