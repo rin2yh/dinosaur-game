@@ -30,6 +30,12 @@ mise run flash-firmware # zero-kb02 に書き込み
 
 タスクの一覧と説明は `mise tasks` で確認できます。
 
+## デプロイ
+
+`main` への push で `.github/workflows/deploy-pages.yml` が WASM をビルドし、`web/` を GitHub Pages に公開します（手動実行も可）。初回のみリポジトリの Settings → Pages → Build and deployment の Source を「GitHub Actions」にしてください。
+
+公開先: https://rin2yh.github.io/dinosaur-game/
+
 ## 構成と移植性
 
 ゲーム本体はエンジン非依存で、Ebitengine と [sago35/koebiten](https://github.com/sago35/koebiten) の 2 つのフロントエンドがあります。
