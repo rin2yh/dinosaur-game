@@ -200,14 +200,35 @@ func TestScoreAndSpeedIncrease(t *testing.T) {
 }
 
 // holds are the button hold lengths the timing searches try: the
-// shortest press the firmware can express, a human tap, and a hold
-// long enough to never be cut short.
+// shortest press the firmware can express, two lengths of human tap,
+// and a hold long enough never to be cut short.
 var holds = []int{2, 6, 12, 40}
 
 // press reports whether the button is down on frame f for a press that
 // starts on frame start and is held for hold frames.
 func press(f, start, hold int) bool {
 	return f >= start && f < start+hold
+}
+
+// atSpeed winds the run's clock to where the given scroll speed is
+// reached. Update recomputes the speed from the frame counter, so
+// pinning the speed alone would not survive the next call.
+func atSpeed(g *Game, speed float64) {
+	g.frame = int((speed - baseSpeed) / accel)
+	g.speed = speed
+}
+
+// worstEnemy builds the hardest version of a kind to get past. Birds
+// drift off the scroll speed, and the slow half is the harder one: it
+// spends longer in front of the player. spawn() hands a slow bird extra
+// room behind it to pay for that, which these searches deliberately do
+// not, so what they check is stricter than what the game deals out.
+func worstEnemy(kind enemyKind, x float64) Enemy {
+	e := newEnemy(kind, x)
+	if b, ok := e.(*bird); ok {
+		b.drift(false)
+	}
+	return e
 }
 
 // clearable reports whether an enemy of the given kind can be jumped
@@ -217,8 +238,8 @@ func clearable(kind enemyKind, speed float64) bool {
 	for _, hold := range holds {
 		for delay := range 120 {
 			g := newRun(1)
-			g.speed = speed
-			g.enemies = append(g.enemies, newEnemy(kind, ScreenWidth))
+			atSpeed(g, speed)
+			g.enemies = append(g.enemies, worstEnemy(kind, ScreenWidth))
 			survived := true
 			for f := 0; len(g.enemies) > 0; f++ {
 				g.spawnIn = ScreenWidth * 2 // suppress further spawns
@@ -237,11 +258,10 @@ func clearable(kind enemyKind, speed float64) bool {
 }
 
 // speedAtScore returns the scroll speed a run has at the given score.
-// The speed ramp is driven by frames and the score is just a frame
-// counter divided by scoreEvery, so the two are locked together.
+// The score is just the frame counter divided by scoreEvery, so this is
+// the game's own ramp read at that frame.
 func speedAtScore(score int) float64 {
-	speed := baseSpeed + accel*scoreEvery*float64(score)
-	return min(speed, maxSpeed)
+	return speedAt(score * scoreEvery)
 }
 
 // TestEnemiesClearableAtUnlockScore is the fairness guard on the
@@ -263,9 +283,9 @@ func TestEnemiesClearableAtUnlockScore(t *testing.T) {
 // how the tightest gaps have to be cleared.
 func pairSurvives(k1, k2 enemyKind, speed, gap float64, d1, h1, d2, h2 int) bool {
 	g := newRun(1)
-	g.speed = speed
+	atSpeed(g, speed)
 	g.enemies = append(g.enemies,
-		newEnemy(k1, ScreenWidth), newEnemy(k2, ScreenWidth+gap))
+		worstEnemy(k1, ScreenWidth), newEnemy(k2, ScreenWidth+gap))
 	for f := 0; len(g.enemies) > 0; f++ {
 		g.spawnIn = ScreenWidth * 4 // suppress further spawns
 		g.Update(press(f, d1, h1) || press(f, d2, h2))
@@ -282,14 +302,21 @@ func pairSurvives(k1, k2 enemyKind, speed, gap float64, d1, h1, d2, h2 int) bool
 // just frame-perfectly. Clearing both with one press counts, and is
 // the only answer once the gap is shorter than a jump.
 func pairRobust(k1, k2 enemyKind, speed, gap float64, r int) bool {
-	// The second press has to be searched all the way out to when the
-	// second enemy actually arrives, which at low speed is far later
-	// than any fixed window would reach.
-	span := int(gap/speed) + 60
-	for _, h1 := range holds {
-		for _, h2 := range holds {
-			for d1 := range 70 {
-				for d2 := d1; d2 < d1+span; d2++ {
+	// The second press is searched out to when the second enemy reaches
+	// the player and no further — pressing after that cannot save it.
+	// At low speed that is much later than any fixed window would
+	// reach, and at high speed much sooner.
+	p := newPlayer()
+	hx, _, hw, _ := p.HitRect()
+	last := int((ScreenWidth+gap-float64(hx+hw))/speed) + 8
+
+	for d1 := range 70 {
+		for d2 := d1; d2 <= last; d2++ {
+			// Hold lengths innermost: a timing that only works with a
+			// long press should not wait for every shorter press to be
+			// swept across every pair of delays first.
+			for _, h1 := range holds {
+				for _, h2 := range holds {
 					ok := true
 					for i := -r; i <= r && ok; i++ {
 						for j := -r; j <= r && ok; j++ {
@@ -345,11 +372,11 @@ func TestBackToBackEnemiesClearable(t *testing.T) {
 		// is the speed at the later of the two unlock scores, and the
 		// gap is at its tightest in frames at max speed. Check both.
 		unlock := max(enemyTable[p.k1].unlock, enemyTable[p.k2].unlock)
+		_, _, w, _ := newEnemy(p.k1, 0).Rect()
 		for _, speed := range []float64{speedAtScore(unlock), maxSpeed} {
-			// The gap the leading enemy earns, measured tail to nose
-			// the way spawn() lays it out, with no random stretch.
-			_, _, w, _ := newEnemy(p.k1, 0).Rect()
-			gap := float64(w) + minSpawnGap(w, speed)
+			// The spacing spawn() lays out for this leader, with the
+			// random stretch at its tightest.
+			gap := minSpawnPitch(w, speed)
 			if !pairRobust(p.k1, p.k2, speed, gap, pairSlack) {
 				t.Errorf("%s at speed %.2f needs tighter than ±%d frame timing with min gap %.0fpx",
 					p.name, speed, pairSlack, gap)
@@ -363,8 +390,8 @@ func TestBackToBackEnemiesClearable(t *testing.T) {
 // flattens out, the run has to keep getting harder some other way.
 func TestDifficultyKeepsRisingPastMaxSpeed(t *testing.T) {
 	flat := 0
-	for score := 0; speedAtScore(score) >= maxSpeed; score++ {
-		flat = score
+	for speedAtScore(flat) < maxSpeed {
+		flat++
 	}
 	if flat >= difficultyPeak {
 		t.Fatalf("speed maxes out at score %d, at or past difficultyPeak %d: nothing scales after that",
@@ -375,24 +402,17 @@ func TestDifficultyKeepsRisingPastMaxSpeed(t *testing.T) {
 	// still be arriving measurably closer together — both the floor
 	// and the widest the random stretch can make it.
 	const w = 8 // a small cactus, the most common enemy
-	worst := func(diff float64) float64 {
-		return minSpawnGap(w, maxSpeed) * lerp(gapJitterEasy, gapJitterHard, diff)
-	}
-	early, late := worst(float64(flat)/difficultyPeak), worst(1)
+	g := newRun(1)
+	g.score = flat
+	early := maxSpawnGap(w, maxSpeed, g.difficulty())
+	late := maxSpawnGap(w, maxSpeed, 1)
 	if late >= early {
 		t.Errorf("worst-case spawn gap did not tighten after the speed cap: %.0fpx -> %.0fpx", early, late)
 	}
 
 	// ...and the roster must still be growing, or the last stretch is
 	// the same handful of enemies at the same spacing.
-	unlockedAt := func(score int) int {
-		n := 0
-		for n < len(enemyTable) && enemyTable[n].unlock <= score {
-			n++
-		}
-		return n
-	}
-	if unlockedAt(difficultyPeak) <= unlockedAt(flat/2) {
+	if unlockedKinds(difficultyPeak) <= unlockedKinds(flat/2) {
 		t.Errorf("no new enemy kind unlocks between score %d and %d", flat/2, difficultyPeak)
 	}
 }
@@ -526,7 +546,7 @@ func TestSpriteSizesMatchConstants(t *testing.T) {
 	check("dinoDead", dinoDead, playerW, playerH)
 	check("birdUp", birdUp, birdW, birdH)
 	check("birdDown", birdDown, birdW, birdH)
-	for _, s := range []sprite{cactusSmallSprite, cactusBigSprite, cactusDoubleSprite} {
+	for _, s := range []sprite{cactusSmallSprite, cactusBigSprite, cactusDoubleSprite, cactusTripleSprite} {
 		w, _ := s.size()
 		for i, row := range s {
 			if len(row) != w {

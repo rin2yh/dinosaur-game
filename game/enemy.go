@@ -1,8 +1,9 @@
 package game
 
 // Enemy is anything that ends the run when the player touches it.
-// New enemy types only need to implement this interface and get an
-// entry in enemyTable.
+// A new enemy type needs to implement this interface and get an entry
+// in enemyTable; only a type that moves at something other than the
+// scroll speed, as bird does, needs spawn() to know about it.
 type Enemy interface {
 	// Update advances the enemy by one frame at the given scroll
 	// speed in pixels per frame.
@@ -46,6 +47,17 @@ var enemyTable = [...]struct {
 // newEnemy creates an enemy of the given kind with its left edge at x.
 func newEnemy(kind enemyKind, x float64) Enemy {
 	return enemyTable[kind].spawn(x)
+}
+
+// unlockedKinds returns how many kinds have unlocked by the given
+// score. The table is ordered by unlock score, so they are always the
+// first n entries — spawn() relies on that, and a test guards it.
+func unlockedKinds(score int) int {
+	n := 0
+	for n < len(enemyTable) && enemyTable[n].unlock <= score {
+		n++
+	}
+	return n
 }
 
 // cactus is a ground obstacle; the variants differ only in sprite.
@@ -96,6 +108,19 @@ type bird struct {
 	x      float64
 	high   bool
 	offset float64
+}
+
+// drift gives the bird its speed offset and returns the head start it
+// has to enter with to keep the gap ahead of it intact: flying in
+// faster, it would otherwise arrive that much sooner than the spacing
+// intended. A slow bird returns a negative lead — it needs no head
+// start, but the enemy behind it needs that much extra room.
+func (b *bird) drift(fast bool) (lead float64) {
+	b.offset = birdSpeedOffset
+	if !fast {
+		b.offset = -birdSpeedOffset
+	}
+	return (ScreenWidth - playerX) * b.offset
 }
 
 func (b *bird) Update(speed float64) {
@@ -170,9 +195,10 @@ var (
 func sideBySide(s sprite, n int) sprite {
 	out := make(sprite, len(s))
 	for i, row := range s {
+		next := "." + row
 		out[i] = row
 		for range n - 1 {
-			out[i] += "." + row
+			out[i] += next
 		}
 	}
 	return out
