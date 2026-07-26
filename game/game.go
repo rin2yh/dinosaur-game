@@ -14,21 +14,33 @@ const (
 	groundY = 56 // y of the ground line
 
 	// Speed curve scaled from the Chromium original (start 6, max 13,
-	// accel 0.001 px/frame^2 on a 600px canvas): max is ~2.2x the
-	// initial speed, reached after roughly two minutes.
+	// accel 0.001 px/frame^2 on a 600px canvas). maxSpeed is set so an
+	// enemy crosses this 128px screen in as many frames as one crosses
+	// the original's 600px canvas at its top speed, which is the real
+	// measure of how much reaction time the player gets.
 	baseSpeed = 1.0
-	maxSpeed  = 2.2
+	maxSpeed  = 2.8
 	accel     = 0.0002
 
 	scoreEvery = 6 // frames per score point
 
-	// Wide or tall enemies unlock only once the scroll speed is high
-	// enough that a jump can physically clear them: the airborne
-	// window is fixed, so the wider the enemy, the faster it has to
-	// pass under the player.
-	bigCactusSpeed    = 1.15
-	doubleCactusSpeed = 1.4
-	birdSpeed         = 1.55
+	// difficultyPeak is the score at which the run stops getting
+	// harder. The speed ramp alone tops out at score 1500, so
+	// everything else the difficulty drives — the enemy roster, how
+	// tightly enemies are packed, how often the hard ones come up —
+	// carries the curve the rest of the way.
+	difficultyPeak = 2500
+
+	// Spawn spacing. The gapFrames values are frames of scroll, so the
+	// spacing they set means the same thing at any speed; the jitter
+	// and the pad are flat pixels. Easy values apply at difficulty 0
+	// and hard ones at difficulty 1, so obstacles come both closer
+	// together and less spread out as a run goes on.
+	gapFramesEasy = 45
+	gapFramesHard = 40
+	gapJitterEasy = 70 // px of random extra gap
+	gapJitterHard = 25
+	gapPad        = 15 // px of flat extra gap at every difficulty
 
 	// Night mode: every invertEvery points the palette inverts for
 	// invertDuration frames (12s), mirroring the original.
@@ -187,25 +199,63 @@ func (g *Game) gameOver() {
 	}
 }
 
+// difficulty reports how far into the difficulty curve the run is, as
+// a 0-to-1 ramp over the score. Score is the run's clock, so this keeps
+// climbing long after the scroll speed has flattened out.
+func (g *Game) difficulty() float64 {
+	d := float64(g.score) / difficultyPeak
+	if d > 1 {
+		d = 1
+	}
+	return d
+}
+
 // minSpawnGap is the smallest pixel gap between consecutive enemies.
-// It scales with speed (like the original) so the time between
-// obstacles never drops below what a full jump plus a landing needs:
-// 45*speed px ≈ 45 frames at any speed.
-func minSpawnGap(speed float64) float64 {
-	return 45*speed + 15
+// It scales with speed (like the original) so the gap is a constant
+// number of frames at any speed, never less than what a full jump plus
+// a landing needs, and it tightens as the difficulty rises.
+func minSpawnGap(speed, diff float64) float64 {
+	return lerp(gapFramesEasy, gapFramesHard, diff)*speed + gapPad
 }
 
 // spawnGapJitter is the random extra gap in pixels added on top of
-// minSpawnGap.
-const spawnGapJitter = 70
+// minSpawnGap. It shrinks with difficulty, so late in a run enemies
+// come at close to the minimum spacing instead of being spread out by
+// the luck of the draw.
+func spawnGapJitter(diff float64) int {
+	return int(lerp(gapJitterEasy, gapJitterHard, diff))
+}
+
+// lerp interpolates from easy to hard over t in [0, 1].
+func lerp(easy, hard, t float64) float64 {
+	return easy + (hard-easy)*t
+}
 
 func (g *Game) spawn() {
+	diff := g.difficulty()
 	kinds := 0
-	for kinds < len(enemyTable) && enemyTable[kinds].unlock <= g.speed {
+	for kinds < len(enemyTable) && enemyTable[kinds].unlock <= g.score {
 		kinds++
 	}
-	g.enemies = append(g.enemies, newEnemy(enemyKind(g.rand(kinds)), ScreenWidth))
-	g.spawnIn = minSpawnGap(g.speed) + float64(g.rand(spawnGapJitter))
+	kind := g.pickKind(kinds, diff)
+	g.enemies = append(g.enemies, newEnemy(kind, spawnX(kind)))
+	g.spawnIn = minSpawnGap(g.speed, diff) + float64(g.rand(spawnGapJitter(diff)))
+}
+
+// pickKind picks one of the first kinds entries of enemyTable. The
+// table is ordered by unlock score, so its tail is the hard end of the
+// roster: rolling twice and keeping the higher roll — with a
+// probability that grows with the difficulty — shifts the mix towards
+// the newly unlocked kinds late in a run without ever locking the easy
+// ones out.
+func (g *Game) pickKind(kinds int, diff float64) enemyKind {
+	k := g.rand(kinds)
+	if g.rand(1000) < int(diff*1000) {
+		if k2 := g.rand(kinds); k2 > k {
+			k = k2
+		}
+	}
+	return enemyKind(k)
 }
 
 // rand returns a pseudo-random int in [0, n) using xorshift32,

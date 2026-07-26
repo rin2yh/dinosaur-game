@@ -167,7 +167,7 @@ func clearable(kind enemyKind, speed float64) bool {
 	for delay := range 120 {
 		g := newRun(1)
 		g.speed = speed
-		g.enemies = append(g.enemies, newEnemy(kind, ScreenWidth))
+		g.enemies = append(g.enemies, newEnemy(kind, spawnX(kind)))
 		survived := true
 		for f := 0; len(g.enemies) > 0; f++ {
 			g.spawnIn = ScreenWidth * 2 // suppress further spawns
@@ -184,21 +184,23 @@ func clearable(kind enemyKind, speed float64) bool {
 	return false
 }
 
-func TestEnemiesClearableAtUnlockSpeed(t *testing.T) {
-	cases := []struct {
-		name  string
-		kind  enemyKind
-		speed float64
-	}{
-		{"cactusSmall", cactusSmall, baseSpeed},
-		{"cactusBig", cactusBig, bigCactusSpeed},
-		{"cactusDouble", cactusDouble, doubleCactusSpeed},
-		{"birdLow", birdLow, birdSpeed},
-		{"birdHigh", birdHigh, birdSpeed},
-	}
-	for _, c := range cases {
-		if !clearable(c.kind, c.speed) {
-			t.Errorf("%s is impossible to clear at its unlock speed %v", c.name, c.speed)
+// speedAtScore returns the scroll speed a run has at the given score.
+// The speed ramp is driven by frames and the score is just a frame
+// counter divided by scoreEvery, so the two are locked together.
+func speedAtScore(score int) float64 {
+	speed := baseSpeed + accel*scoreEvery*float64(score)
+	return min(speed, maxSpeed)
+}
+
+// TestEnemiesClearableAtUnlockScore is the fairness guard on the
+// roster: an enemy that unlocks before the scroll is fast enough to
+// carry it under the player within one jump is impossible, not hard.
+func TestEnemiesClearableAtUnlockScore(t *testing.T) {
+	for kind := range len(enemyTable) {
+		speed := speedAtScore(enemyTable[kind].unlock)
+		if !clearable(enemyKind(kind), speed) {
+			t.Errorf("enemy kind %d is impossible to clear at speed %v, the speed at its unlock score %d",
+				kind, speed, enemyTable[kind].unlock)
 		}
 	}
 }
@@ -209,7 +211,7 @@ func pairSurvives(k1, k2 enemyKind, speed, gap float64, d1, d2 int) bool {
 	g := newRun(1)
 	g.speed = speed
 	g.enemies = append(g.enemies,
-		newEnemy(k1, ScreenWidth), newEnemy(k2, ScreenWidth+gap))
+		newEnemy(k1, spawnX(k1)), newEnemy(k2, spawnX(k2)+gap))
 	for f := 0; len(g.enemies) > 0; f++ {
 		g.spawnIn = ScreenWidth * 4 // suppress further spawns
 		g.Update(f == d1 || f == d2)
@@ -241,21 +243,22 @@ func pairRobust(k1, k2 enemyKind, speed, gap float64, r int) bool {
 	return false
 }
 
-// TestBackToBackEnemiesClearableAtMaxSpeed guards the spawn-gap
-// formula: even the tightest gap at max speed must be clearable with
-// at least ±5 frames (~83ms) of slack on both jumps.
 // TestEnemyTableUnlocksSorted guards spawn()'s assumption that the
 // unlocked kinds always form a prefix of enemyTable.
 func TestEnemyTableUnlocksSorted(t *testing.T) {
 	for i := 1; i < len(enemyTable); i++ {
 		if enemyTable[i].unlock < enemyTable[i-1].unlock {
-			t.Fatalf("enemyTable not sorted by unlock speed at index %d", i)
+			t.Fatalf("enemyTable not sorted by unlock score at index %d", i)
 		}
 	}
 }
 
-func TestBackToBackEnemiesClearableAtMaxSpeed(t *testing.T) {
-	minGap := minSpawnGap(maxSpeed)
+// TestBackToBackEnemiesClearableAtPeakDifficulty guards the spawn-gap
+// formula at its tightest: max speed, difficulty 1, no jitter. Even
+// there a pair must be clearable with at least ±5 frames (~83ms) of
+// slack on both jumps.
+func TestBackToBackEnemiesClearableAtPeakDifficulty(t *testing.T) {
+	minGap := minSpawnGap(maxSpeed, 1)
 	pairs := []struct {
 		name   string
 		k1, k2 enemyKind
@@ -263,11 +266,93 @@ func TestBackToBackEnemiesClearableAtMaxSpeed(t *testing.T) {
 		{"birdLow->cactusSmall", birdLow, cactusSmall},
 		{"cactusSmall->cactusSmall", cactusSmall, cactusSmall},
 		{"cactusDouble->cactusSmall", cactusDouble, cactusSmall},
+		{"cactusTriple->cactusSmall", cactusTriple, cactusSmall},
+		{"cactusSmall->cactusTriple", cactusSmall, cactusTriple},
+		{"birdFast->cactusSmall", birdFast, cactusSmall},
+		{"cactusSmall->birdFast", cactusSmall, birdFast},
 	}
 	for _, p := range pairs {
 		if !pairRobust(p.k1, p.k2, maxSpeed, minGap, 5) {
-			t.Errorf("%s needs tighter than ±5 frame timing at max speed with min gap %.0fpx", p.name, minGap)
+			t.Errorf("%s needs tighter than ±5 frame timing at peak difficulty with min gap %.0fpx", p.name, minGap)
 		}
+	}
+}
+
+// TestDifficultyKeepsRisingPastMaxSpeed is the regression guard for
+// the complaint this scaling exists to fix: once the speed ramp
+// flattens out, the run has to keep getting harder some other way.
+func TestDifficultyKeepsRisingPastMaxSpeed(t *testing.T) {
+	flat := 0
+	for score := 0; speedAtScore(score) >= maxSpeed; score++ {
+		flat = score
+	}
+	if flat >= difficultyPeak {
+		t.Fatalf("speed maxes out at score %d, at or past difficultyPeak %d: nothing scales after that",
+			flat, difficultyPeak)
+	}
+
+	// Between the speed cap and the difficulty peak, enemies must
+	// still be arriving measurably closer together.
+	early := minSpawnGap(maxSpeed, float64(flat)/difficultyPeak) + float64(spawnGapJitter(float64(flat)/difficultyPeak))
+	late := minSpawnGap(maxSpeed, 1) + float64(spawnGapJitter(1))
+	if late >= early {
+		t.Errorf("worst-case spawn gap did not tighten after the speed cap: %.0fpx -> %.0fpx", early, late)
+	}
+
+	// ...and the roster must still be growing, or the last stretch is
+	// the same handful of enemies at the same spacing.
+	unlockedAt := func(score int) int {
+		n := 0
+		for n < len(enemyTable) && enemyTable[n].unlock <= score {
+			n++
+		}
+		return n
+	}
+	if unlockedAt(difficultyPeak) <= unlockedAt(flat/2) {
+		t.Errorf("no new enemy kind unlocks between score %d and %d", flat/2, difficultyPeak)
+	}
+}
+
+// TestHarderEnemiesGetMoreCommon checks the late-game mix actually
+// shifts: the same roster picked uniformly forever would keep the hard
+// kinds as rare as the day they unlocked.
+func TestHarderEnemiesGetMoreCommon(t *testing.T) {
+	const kinds = len(enemyTable)
+	count := func(diff float64) int {
+		g := newRun(7)
+		hard := 0
+		for range 4000 {
+			if int(g.pickKind(kinds, diff)) >= kinds/2 {
+				hard++
+			}
+		}
+		return hard
+	}
+	easy, late := count(0), count(1)
+	if late <= easy {
+		t.Errorf("hard-half picks per 4000 spawns: %d at difficulty 0, %d at difficulty 1; want more when harder",
+			easy, late)
+	}
+}
+
+// TestDifficultyRampIsMonotonic checks the curve only ever goes up and
+// then holds, so a longer run is never an easier one.
+func TestDifficultyRampIsMonotonic(t *testing.T) {
+	g := newRun(1)
+	prev := -1.0
+	for score := 0; score <= difficultyPeak*2; score += 25 {
+		g.score = score
+		d := g.difficulty()
+		if d < prev {
+			t.Fatalf("difficulty dropped at score %d: %v -> %v", score, prev, d)
+		}
+		if d > 1 {
+			t.Fatalf("difficulty exceeded 1 at score %d: %v", score, d)
+		}
+		prev = d
+	}
+	if prev != 1 {
+		t.Fatalf("difficulty never reached 1; got %v", prev)
 	}
 }
 
