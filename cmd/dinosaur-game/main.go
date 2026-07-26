@@ -1,6 +1,7 @@
 // Command dinosaur-game is the Ebitengine frontend for the dinosaur
-// game. All game logic and rendering live in the engine-agnostic game
-// package; this file only wires up input and the framebuffer.
+// game, covering both desktop and the browser via WebAssembly. All game
+// logic and rendering live in the engine-agnostic game package; this
+// file only wires up input and the framebuffer.
 package main
 
 import (

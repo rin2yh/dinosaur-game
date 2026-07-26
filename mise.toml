@@ -1,3 +1,26 @@
 [tools]
 go = "1.25.6"
 tinygo = "0.41.1"
+
+[tasks.build]
+description = "デスクトップ向けバイナリを bin/ にビルド"
+run = "go build -o bin/dinosaur-game ./cmd/dinosaur-game"
+
+[tasks.build-web]
+description = "web/ に WASM をビルド"
+run = [
+  "GOOS=js GOARCH=wasm go build -o web/game.wasm ./cmd/dinosaur-game",
+  "cp \"$(go env GOROOT)/lib/wasm/wasm_exec.js\" web/",
+]
+
+[tasks.flash-firmware]
+description = "zero-kb02 に書き込み"
+run = "tinygo flash --target ./targets/zero-kb02.json --size short ./cmd/firmware"
+
+[tasks.serve]
+description = "wasmserve で http://localhost:8000 に配信（リロードで再ビルド）"
+run = "go tool wasmserve -http=:8000 ./cmd/dinosaur-game"
+
+[tasks.clean]
+description = "ビルド成果物を削除"
+run = "rm -rf bin web/game.wasm web/wasm_exec.js"

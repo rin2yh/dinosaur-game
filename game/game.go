@@ -81,6 +81,16 @@ func New(seed uint32) *Game {
 
 // startRun resets all per-run state and enters ModePlaying.
 func (g *Game) startRun() {
+	// Fold the frame the run starts on into the rng. Boards without a
+	// clock boot into an identical state every time, so the player's
+	// press timing is the only entropy a frontend there can offer;
+	// mixing it in here keeps seeding out of every frontend. The frame
+	// count is small, so spread it over the whole word with Knuth's
+	// multiplicative constant before mixing. rng must stay non-zero or
+	// xorshift32 sticks at zero forever.
+	if g.rng ^= uint32(g.frame) * 2654435761; g.rng == 0 {
+		g.rng = 1
+	}
 	g.mode = ModePlaying
 	g.frame = 0
 	g.overFrame = 0
