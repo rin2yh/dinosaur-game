@@ -5,14 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Dinosaur Game</title>
 <style>
-  html, body {
-    margin: 0;
+  /* Ebitengine sizes its canvas from <body>, so the body *is* the game area.
+     Give it a fixed size instead of the whole viewport: the 128x64 screen at
+     4x (512x256) puts the sprites at roughly the original T-Rex Runner scale.
+     Shrink to fit narrow (100vw) or short (200vh, the 2:1 aspect) viewports. */
+  html {
     height: 100%;
-    background: #f7f7f7;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: #f7f7f7;
     overflow: hidden;
+  }
+  body {
+    margin: 0;
+    width: min(512px, 100vw, 200vh);
+    aspect-ratio: 2 / 1;
+    /* Ebitengine sets height:100% inline on the body; !important wins. */
+    height: auto !important;
   }
   canvas {
     image-rendering: pixelated;
