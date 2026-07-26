@@ -1,6 +1,6 @@
 # Dinosaur Game
 
-Chrome の恐竜ゲーム（T-Rex Runner)のクローン。Go + [Ebitengine](https://ebitengine.org/) 製で、Web (WebAssembly) 上で動作します。
+どこかで見たような恐竜ゲーム。Go + [Ebitengine](https://ebitengine.org/) 製で、Web (WebAssembly) 上で動作します。
 
 ## 操作
 
