@@ -13,39 +13,13 @@ run = [
   "cp \"$(go env GOROOT)/lib/wasm/wasm_exec.js\" web/",
 ]
 
-[tasks.build-firmware]
-description = "zero-kb02 向け UF2 を bin/ にビルド（TinyGo）"
-run = "tinygo build -o bin/dinosaur-game.uf2 --target ./targets/zero-kb02.json --size short ./cmd/firmware"
-
 [tasks.flash-firmware]
 description = "zero-kb02 に書き込み"
 run = "tinygo flash --target ./targets/zero-kb02.json --size short ./cmd/firmware"
 
-[tasks.run]
-description = "デスクトップで実行"
-run = "go run ./cmd/dinosaur-game"
-
 [tasks.serve]
 description = "wasmserve で http://localhost:8000 に配信（リロードで再ビルド）"
 run = "go tool wasmserve -http=:8000 ./cmd/dinosaur-game"
-
-[tasks.fmt]
-description = "go fmt"
-run = "go fmt ./..."
-
-[tasks.lint]
-description = "go vet"
-run = "go vet ./..."
-
-[tasks.test]
-description = "go test"
-run = "go test ./..."
-
-[tasks.check]
-# cmd/firmware is behind a tinygo build tag, so go vet and go test skip
-# it entirely; the TinyGo build is the only thing that type-checks it.
-description = "fmt + vet + test + ファームウェアビルド"
-depends = ["fmt", "lint", "test", "build-firmware"]
 
 [tasks.clean]
 description = "ビルド成果物を削除"
