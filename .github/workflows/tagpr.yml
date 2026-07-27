@@ -4,10 +4,8 @@ on:
   push:
     branches: [main]
 
-# Deny by default; the job opts into only what it needs.
 permissions: {}
 
-# Let an in-flight tagging run finish; queue the next push behind it.
 concurrency:
   group: tagpr
   cancel-in-progress: false
@@ -15,8 +13,7 @@ concurrency:
 jobs:
   tagpr:
     runs-on: ubuntu-latest
-    # issues: read is for the labels on the release PR, which are what
-    # choose the bump.
+    # issues: read is for the bump labels on the release PR.
     permissions:
       contents: write
       pull-requests: write
@@ -24,11 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # tagpr feeds the token to git itself, so the checkout has no
-          # reason to leave one behind in .git/config.
+          # tagpr feeds the token to git itself.
           persist-credentials: false
-          # tagpr unshallows on every run and reads the tags locally, so
-          # fetching them here costs one round trip instead of two.
+          # tagpr unshallows on every run anyway.
           fetch-depth: 0
 
       - uses: Songmu/tagpr@d1b8138b7a31075141b6cd64103de9485ced7ac9 # v1.20.1
