@@ -83,18 +83,30 @@ func TestJumpHeightFollowsHold(t *testing.T) {
 		return playerStandY - peak, frames
 	}
 
-	tapH, tapF := fly(2)
-	holdH, holdF := fly(40)
-	if tapH < minJumpHeight {
-		t.Errorf("the shortest press rises %.1fpx, below the %.1fpx floor", tapH, minJumpHeight)
+	// The shortest press has to stay useful, or the cut is a trap
+	// rather than a tool.
+	_, _, _, cactusH := newEnemy(cactusSmall, 0).Rect()
+	if rise, _ := fly(holds[0]); rise < minJumpHeight || rise < float64(cactusH) {
+		t.Errorf("shortest press rises %.1fpx, under the %.1fpx floor or the %dpx cactus",
+			rise, minJumpHeight, cactusH)
 	}
-	if tapH >= holdH || tapF >= holdF {
-		t.Errorf("holding did not buy a bigger jump: tap %.1fpx/%df, hold %.1fpx/%df",
-			tapH, tapF, holdH, holdF)
+
+	cases := []struct {
+		name string
+		hold int
+	}{
+		{"shortest the firmware can press", holds[0]},
+		{"human tap", 6},
+		{"held down", 40},
 	}
-	// A tap has to stay useful, or the cut is a trap rather than a tool.
-	if _, _, _, h := newEnemy(cactusSmall, 0).Rect(); tapH < float64(h) {
-		t.Errorf("the shortest press rises %.1fpx, not enough for a %dpx cactus", tapH, h)
+	prevRise, prevFrames := 0.0, 0
+	for _, c := range cases {
+		rise, frames := fly(c.hold)
+		if rise < prevRise || frames < prevFrames {
+			t.Errorf("%s (%d frames): rose %.1fpx over %df, less than the press before it (%.1fpx, %df)",
+				c.name, c.hold, rise, frames, prevRise, prevFrames)
+		}
+		prevRise, prevFrames = rise, frames
 	}
 }
 
@@ -108,24 +120,24 @@ func TestCollisionEndsGame(t *testing.T) {
 }
 
 func TestHighBirdHitsOnlyWhenJumping(t *testing.T) {
-	// Running under a high bird is safe.
-	g := newPlaying(t)
-	g.enemies = append(g.enemies, newEnemy(birdHigh, playerX))
-	g.Update(false)
-	if g.Mode() != ModePlaying {
-		t.Fatalf("high bird hit a grounded player")
+	cases := []struct {
+		name string
+		rise int // frames spent rising before the bird arrives
+		want Mode
+	}{
+		{"grounded runs under it", 0, ModePlaying},
+		{"jumping hits it", 4, ModeGameOver},
 	}
-
-	// Jumping into it is not.
-	g = newPlaying(t)
-	g.Update(true) // start rising
-	for range 3 {
+	for _, c := range cases {
+		g := newPlaying(t)
+		for f := range c.rise {
+			g.Update(f == 0)
+		}
+		g.enemies = append(g.enemies, newEnemy(birdHigh, playerX))
 		g.Update(false)
-	}
-	g.enemies = append(g.enemies, newEnemy(birdHigh, playerX))
-	g.Update(false)
-	if g.Mode() != ModeGameOver {
-		t.Fatalf("high bird did not hit a jumping player (y=%v)", g.player.y)
+		if g.Mode() != c.want {
+			t.Errorf("%s: mode = %v, want %v (y=%v)", c.name, g.Mode(), c.want, g.player.y)
+		}
 	}
 }
 
@@ -199,9 +211,8 @@ func TestScoreAndSpeedIncrease(t *testing.T) {
 	}
 }
 
-// holds are the button hold lengths the timing searches try: the
-// shortest press the firmware can express, two lengths of human tap,
-// and a hold long enough never to be cut short.
+// holds are the hold lengths the timing searches try, from the
+// shortest press the firmware can express to one never cut short.
 var holds = []int{2, 6, 12, 40}
 
 // press reports whether the button is down on frame f for a press that
@@ -210,19 +221,18 @@ func press(f, start, hold int) bool {
 	return f >= start && f < start+hold
 }
 
-// atSpeed winds the run's clock to where the given scroll speed is
-// reached. Update recomputes the speed from the frame counter, so
-// pinning the speed alone would not survive the next call.
+// atSpeed winds the run's clock to the given scroll speed. Update
+// recomputes speed from the frame, so pinning speed alone would not
+// survive the next call.
 func atSpeed(g *Game, speed float64) {
 	g.frame = int((speed - baseSpeed) / accel)
 	g.speed = speed
 }
 
-// worstEnemy builds the hardest version of a kind to get past. Birds
-// drift off the scroll speed, and the slow half is the harder one: it
-// spends longer in front of the player. spawn() hands a slow bird extra
-// room behind it to pay for that, which these searches deliberately do
-// not, so what they check is stricter than what the game deals out.
+// worstEnemy builds the hardest version of a kind to get past: a bird
+// drifting slow, which lingers longest in front of the player. spawn()
+// pays for that with extra room behind it and these searches do not, so
+// they check something stricter than the game deals out.
 func worstEnemy(kind enemyKind, x float64) Enemy {
 	e := newEnemy(kind, x)
 	if b, ok := e.(*bird); ok {
@@ -257,9 +267,8 @@ func clearable(kind enemyKind, speed float64) bool {
 	return false
 }
 
-// speedAtScore returns the scroll speed a run has at the given score.
-// The score is just the frame counter divided by scoreEvery, so this is
-// the game's own ramp read at that frame.
+// speedAtScore is the game's own ramp read at the frame the given
+// score falls on.
 func speedAtScore(score int) float64 {
 	return speedAt(score * scoreEvery)
 }
@@ -302,19 +311,16 @@ func pairSurvives(k1, k2 enemyKind, speed, gap float64, d1, h1, d2, h2 int) bool
 // just frame-perfectly. Clearing both with one press counts, and is
 // the only answer once the gap is shorter than a jump.
 func pairRobust(k1, k2 enemyKind, speed, gap float64, r int) bool {
-	// The second press is searched out to when the second enemy reaches
-	// the player and no further — pressing after that cannot save it.
-	// At low speed that is much later than any fixed window would
-	// reach, and at high speed much sooner.
+	// Pressing after the second enemy reaches the player cannot save
+	// it, so the search stops there rather than at a fixed window.
 	p := newPlayer()
 	hx, _, hw, _ := p.HitRect()
 	last := int((ScreenWidth+gap-float64(hx+hw))/speed) + 8
 
 	for d1 := range 70 {
 		for d2 := d1; d2 <= last; d2++ {
-			// Hold lengths innermost: a timing that only works with a
-			// long press should not wait for every shorter press to be
-			// swept across every pair of delays first.
+			// Innermost, so a timing that needs a long press is not
+			// found only after every shorter one has been swept.
 			for _, h1 := range holds {
 				for _, h2 := range holds {
 					ok := true
@@ -343,11 +349,9 @@ func TestEnemyTableUnlocksSorted(t *testing.T) {
 	}
 }
 
-// pairSlack is the timing slop the tightest spawn gap has to leave on
-// every press, and the bar the gap constants are calibrated against.
-// Asking for more visibly flattens the late game — an earlier cut of
-// this used ±5 and the tight end simply never arrived — while asking
-// for less would be trusting frame-perfect play.
+// pairSlack is the timing slop the tightest gap has to leave on every
+// press, and the bar the gap constants are calibrated against. More
+// flattens the late game; less trusts frame-perfect play.
 const pairSlack = 3
 
 // TestBackToBackEnemiesClearable guards the spawn-gap formula at its
@@ -368,14 +372,11 @@ func TestBackToBackEnemiesClearable(t *testing.T) {
 		{"cactusSmall->birdLow", cactusSmall, birdLow},
 	}
 	for _, p := range pairs {
-		// The slowest the run can be when this pair is possible at all
-		// is the speed at the later of the two unlock scores, and the
-		// gap is at its tightest in frames at max speed. Check both.
+		// Slowest this pair can occur at is the later unlock; tightest
+		// in frames is max speed. Check both.
 		unlock := max(enemyTable[p.k1].unlock, enemyTable[p.k2].unlock)
 		_, _, w, _ := newEnemy(p.k1, 0).Rect()
 		for _, speed := range []float64{speedAtScore(unlock), maxSpeed} {
-			// The spacing spawn() lays out for this leader, with the
-			// random stretch at its tightest.
 			gap := minSpawnPitch(w, speed)
 			if !pairRobust(p.k1, p.k2, speed, gap, pairSlack) {
 				t.Errorf("%s at speed %.2f needs tighter than ±%d frame timing with min gap %.0fpx",
@@ -529,28 +530,30 @@ func TestDrawStaysInBounds(t *testing.T) {
 }
 
 func TestSpriteSizesMatchConstants(t *testing.T) {
-	check := func(name string, s sprite, w, h int) {
-		gw, gh := s.size()
-		if gw != w || gh != h {
-			t.Errorf("%s size = %dx%d, want %dx%d", name, gw, gh, w, h)
-		}
-		for i, row := range s {
-			if len(row) != w {
-				t.Errorf("%s row %d width = %d, want %d", name, i, len(row), w)
-			}
-		}
+	cases := []struct {
+		name string
+		s    sprite
+		w, h int
+	}{
+		{"dinoRun1", dinoRun1, playerW, playerH},
+		{"dinoRun2", dinoRun2, playerW, playerH},
+		{"dinoStand", dinoStand, playerW, playerH},
+		{"dinoDead", dinoDead, playerW, playerH},
+		{"birdUp", birdUp, birdW, birdH},
+		{"birdDown", birdDown, birdW, birdH},
+		{"cactusSmall", cactusSmallSprite, 8, 12},
+		{"cactusBig", cactusBigSprite, 10, 16},
+		{"cactusDouble", cactusDoubleSprite, 17, 12},
+		{"cactusTriple", cactusTripleSprite, 26, 12},
 	}
-	check("dinoRun1", dinoRun1, playerW, playerH)
-	check("dinoRun2", dinoRun2, playerW, playerH)
-	check("dinoStand", dinoStand, playerW, playerH)
-	check("dinoDead", dinoDead, playerW, playerH)
-	check("birdUp", birdUp, birdW, birdH)
-	check("birdDown", birdDown, birdW, birdH)
-	for _, s := range []sprite{cactusSmallSprite, cactusBigSprite, cactusDoubleSprite, cactusTripleSprite} {
-		w, _ := s.size()
-		for i, row := range s {
-			if len(row) != w {
-				t.Errorf("cactus row %d width = %d, want %d", i, len(row), w)
+	for _, c := range cases {
+		w, h := c.s.size()
+		if w != c.w || h != c.h {
+			t.Errorf("%s size = %dx%d, want %dx%d", c.name, w, h, c.w, c.h)
+		}
+		for i, row := range c.s {
+			if len(row) != c.w {
+				t.Errorf("%s row %d width = %d, want %d", c.name, i, len(row), c.w)
 			}
 		}
 	}

@@ -1,9 +1,8 @@
 package game
 
-// Enemy is anything that ends the run when the player touches it.
-// A new enemy type needs to implement this interface and get an entry
-// in enemyTable; only a type that moves at something other than the
-// scroll speed, as bird does, needs spawn() to know about it.
+// Enemy is anything that ends the run when the player touches it. A
+// new type needs this interface and an entry in enemyTable; only one
+// that moves off the scroll speed, as bird does, concerns spawn().
 type Enemy interface {
 	// Update advances the enemy by one frame at the given scroll
 	// speed in pixels per frame.
@@ -50,8 +49,7 @@ func newEnemy(kind enemyKind, x float64) Enemy {
 }
 
 // unlockedKinds returns how many kinds have unlocked by the given
-// score. The table is ordered by unlock score, so they are always the
-// first n entries — spawn() relies on that, and a test guards it.
+// score. They are always the first n entries; a test guards that.
 func unlockedKinds(score int) int {
 	n := 0
 	for n < len(enemyTable) && enemyTable[n].unlock <= score {
@@ -90,12 +88,9 @@ const (
 	birdH         = 6
 	birdFlyHeight = 4 // gap between a low bird and the ground
 
-	// Every bird flies a little off the scroll speed, half of them
-	// faster and half slower. A fast one gives less warning than
-	// anything else in the game; a slow one drifts back into the gap
-	// behind it. It is a fraction of the scroll rather than a flat
-	// px/frame, so the drift stays the same 12% at either end of the
-	// speed range.
+	// Every bird flies off the scroll speed, half faster and half
+	// slower: a fast one gives the least warning in the game. A fraction
+	// rather than a flat px/frame, so it holds across the speed range.
 	birdSpeedOffset = 0.12
 )
 
@@ -109,11 +104,9 @@ type bird struct {
 	offset float64
 }
 
-// drift gives the bird its speed offset and returns the head start it
-// has to enter with to keep the gap ahead of it intact: flying in
-// faster, it would otherwise arrive that much sooner than the spacing
-// intended. A slow bird returns a negative lead — it needs no head
-// start, but the enemy behind it needs that much extra room.
+// drift sets the bird's speed offset and returns the head start it
+// needs for the gap ahead of it to survive. A slow bird returns a
+// negative lead: the enemy behind it needs that much extra room.
 func (b *bird) drift(fast bool) (lead float64) {
 	b.offset = birdSpeedOffset
 	if !fast {
