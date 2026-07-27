@@ -83,8 +83,9 @@ func (p *Player) Draw(d Display, frame int, mode Mode) {
 	drawSprite(d, playerX, int(p.y), s)
 }
 
-// The dinosaur: boxy head with an eye and a mouth notch at the right,
-// tail tip raised at the left, a stubby arm, and two legs.
+// dinoBody is the dinosaur from head to hip; withLegs appends the leg
+// rows, so the poses differ only in the legs. The unlit pixel in the
+// head is the eye.
 var dinoBody = sprite{
 	"........######",
 	"........#.####",

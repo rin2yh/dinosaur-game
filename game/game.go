@@ -44,8 +44,8 @@ const (
 	// Cap on identical kinds in a row, so the run is never a metronome.
 	maxSameKind = 2
 
-	// Night mode: every invertEvery points the palette inverts for
-	// invertDuration frames (12s).
+	// Night mode: the palette inverts for invertDuration frames every
+	// invertEvery points, which at scoreEvery is about 70s of play.
 	invertEvery    = 700
 	invertDuration = 12 * 60
 

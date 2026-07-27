@@ -13,7 +13,8 @@ import (
 	"github.com/rin2yh/dinosaur-game/game"
 )
 
-// Dark gray on off-white.
+// bg is repeated as the page background in web/index.html; the canvas
+// is letterboxed there, and the seam shows if the two drift apart.
 var (
 	bg = [4]byte{0xf7, 0xf7, 0xf7, 0xff}
 	fg = [4]byte{0x53, 0x53, 0x53, 0xff}
