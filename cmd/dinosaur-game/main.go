@@ -13,7 +13,7 @@ import (
 	"github.com/rin2yh/dinosaur-game/game"
 )
 
-// Chrome dino palette: dark gray on off-white.
+// Dark gray on off-white.
 var (
 	bg = [4]byte{0xf7, 0xf7, 0xf7, 0xff}
 	fg = [4]byte{0x53, 0x53, 0x53, 0xff}

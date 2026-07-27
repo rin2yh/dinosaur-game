@@ -59,8 +59,7 @@ func (p *Player) Update(pressed, held bool, speed float64) {
 }
 
 // HitRect returns the tighter box used for collisions. It excludes
-// the tail and the sprite fringe so near misses feel fair, like the
-// original's per-part collision boxes.
+// the tail and the sprite fringe so near misses feel fair.
 func (p *Player) HitRect() (x, y, w, h int) {
 	return playerX + 4, int(p.y) + 1, playerW - 5, playerH - 2
 }
@@ -84,9 +83,8 @@ func (p *Player) Draw(d Display, frame int, mode Mode) {
 	drawSprite(d, playerX, int(p.y), s)
 }
 
-// The dinosaur, modeled after the Chrome T-Rex: boxy head with an eye
-// and a mouth notch at the right, tail tip raised at the left, a stubby
-// arm, and two legs.
+// The dinosaur: boxy head with an eye and a mouth notch at the right,
+// tail tip raised at the left, a stubby arm, and two legs.
 var dinoBody = sprite{
 	"........######",
 	"........#.####",
