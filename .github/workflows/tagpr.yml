@@ -7,8 +7,7 @@ on:
 # Deny by default; the job opts into only what it needs.
 permissions: {}
 
-# Two pushes in a row must not race over the same tag; let the first
-# finish rather than cancelling it midway through tagging.
+# Let an in-flight tagging run finish; queue the next push behind it.
 concurrency:
   group: tagpr
   cancel-in-progress: false
@@ -16,9 +15,8 @@ concurrency:
 jobs:
   tagpr:
     runs-on: ubuntu-latest
-    # contents: push the release commit and the tag. pull-requests: open
-    # and update the release PR. issues: read the labels on it, which are
-    # what choose the bump.
+    # issues: read is for the labels on the release PR, which are what
+    # choose the bump.
     permissions:
       contents: write
       pull-requests: write
@@ -27,9 +25,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # tagpr feeds the token to git itself, so the checkout has no
-          # reason to leave one behind in .git/config. The shallow clone
-          # is fine too: tagpr unshallows when it needs the history.
+          # reason to leave one behind in .git/config.
           persist-credentials: false
+          # tagpr unshallows on every run and reads the tags locally, so
+          # fetching them here costs one round trip instead of two.
+          fetch-depth: 0
 
       - uses: Songmu/tagpr@d1b8138b7a31075141b6cd64103de9485ced7ac9 # v1.20.1
         env:

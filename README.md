@@ -60,9 +60,9 @@ mise run flash-firmware # zero-kb02 に書き込み
 
 1.0 は機能が揃ったかどうかではなく、`game` パッケージの前提をもう動かさないと判断できたときに切ります。当面は 0.x のままです。
 
-`game.Version` を持っているのは、ボードに時計もバージョン表示も無く、書き込んだファームウェアがどのコミットのものかを後から辿る手掛かりが他にないためです。リリース間の `main` では直前のリリース版を指します。
+`game.Version`（`game/version.go`）はまだどこからも読んでいない定数です。リリース間の `main` では直前のリリース版を指すので、実機に版を出したくなったらこれを読んでください。
 
-初回のみリポジトリの Settings → Actions → General → Workflow permissions で「Allow GitHub Actions to create and approve pull requests」を有効にしてください。無効のままだと tagpr がリリース PR を作れません。
+初回のみ、リポジトリの Settings → Actions → General → Workflow permissions で「Allow GitHub Actions to create and approve pull requests」を有効にし（無効のままだと tagpr がリリース PR を作れません）、バンプ用の `major` / `minor` ラベルを作成してください。
 
 ## 構成と移植性
 

@@ -1,14 +1,12 @@
 package game
 
-// Version is the released version of this repository. tagpr rewrites it
-// in the release pull request so that it always matches the git tag (see
-// .tagpr); it is not edited by hand.
+// Version is the released version of this repository, rewritten by tagpr
+// in the release pull request to match the git tag (see .tagpr); it is
+// not edited by hand, and between releases it names the last release
+// rather than the working tree.
 //
-// It exists because the board has neither a clock nor a version display,
-// so a constant compiled into the firmware is the only handle for
-// telling later which source a flashed board is running. On main between
-// releases it names the last release, not the working tree.
-//
-// It lives in this package because both frontends already import it,
-// not because it says anything about the game.
+// It exists for the firmware, since the board has neither a clock nor a
+// version display: a frontend that carries this value is the only way to
+// tell later which source a flashed board came from. Nothing reads it
+// yet, so no binary carries the string until something does.
 const Version = "0.0.0"
