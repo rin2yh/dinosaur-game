@@ -6,7 +6,18 @@ const (
 	playerH = 15
 
 	gravity = 0.22
-	jumpVel = -3.6
+
+	// Jump velocity, with a term that leans on the current scroll speed
+	// so a faster run jumps a little higher and the airborne window does
+	// not shrink in distance as the ground rushes by.
+	jumpVel         = -3.6
+	jumpVelPerSpeed = -0.134
+
+	// Letting go mid-rise caps the rest of the climb at dropVel, making
+	// a tap a short hop and a held press a full jump. The cut waits for
+	// minJumpHeight, so even the shortest hop clears a small cactus.
+	dropVel       = -1.7
+	minJumpHeight = 9.4
 
 	// playerStandY is the player's top edge when standing on the ground.
 	playerStandY = groundY - playerH
@@ -27,10 +38,17 @@ func (p *Player) onGround() bool {
 	return p.y >= playerStandY && p.velY >= 0
 }
 
-// Update advances the player physics by one frame.
-func (p *Player) Update(jumpPressed bool) {
-	if jumpPressed && p.onGround() {
-		p.velY = jumpVel
+// Update advances the player physics by one frame. pressed is the
+// press edge, held the button level.
+func (p *Player) Update(pressed, held bool, speed float64) {
+	if pressed && p.onGround() {
+		p.velY = jumpVel + jumpVelPerSpeed*speed
+	}
+	// Checked against the level every frame, not the release edge: a
+	// release below minJumpHeight would otherwise become a full jump,
+	// and the firmware samples at ~31Hz so its taps are two frames.
+	if !held && p.velY < dropVel && playerStandY-p.y >= minJumpHeight {
+		p.velY = dropVel
 	}
 	p.velY += gravity
 	p.y += p.velY

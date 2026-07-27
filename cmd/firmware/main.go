@@ -54,12 +54,17 @@ type app struct {
 }
 
 func (a *app) Update() error {
-	a.keys = koebiten.AppendJustPressedKeys(a.keys[:0])
+	// The game wants the button state, not the press edge: holding a
+	// key is how the player asks for a taller jump. That also means the
+	// shortest press this frontend can express is one tick, or two game
+	// frames — enough for the game to tell a tap from a hold.
+	a.keys = koebiten.AppendPressedKeys(a.keys[:0])
+	held := len(a.keys) > 0
 
 	// koebiten ticks every 32ms (~31 TPS) while the game assumes 60
 	// TPS, so step the game twice per tick to keep wall-clock speed.
-	a.g.Update(len(a.keys) > 0)
-	a.g.Update(false)
+	a.g.Update(held)
+	a.g.Update(held)
 	return nil
 }
 

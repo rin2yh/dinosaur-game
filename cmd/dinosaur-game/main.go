@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
 	"github.com/rin2yh/dinosaur-game/game"
 )
@@ -46,10 +45,12 @@ type app struct {
 }
 
 func (a *app) Update() error {
-	jump := inpututil.IsKeyJustPressed(ebiten.KeySpace) ||
-		inpututil.IsKeyJustPressed(ebiten.KeyArrowUp) ||
-		inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) ||
-		len(inpututil.AppendJustPressedTouchIDs(a.touchIDs[:0])) > 0
+	// The game wants the button state, not the press edge: holding the
+	// jump button is how the player asks for a taller jump.
+	jump := ebiten.IsKeyPressed(ebiten.KeySpace) ||
+		ebiten.IsKeyPressed(ebiten.KeyArrowUp) ||
+		ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) ||
+		len(ebiten.AppendTouchIDs(a.touchIDs[:0])) > 0
 	a.g.Update(jump)
 	return nil
 }

@@ -13,22 +13,36 @@ const (
 const (
 	groundY = 56 // y of the ground line
 
-	// Speed curve scaled from the Chromium original (start 6, max 13,
-	// accel 0.001 px/frame^2 on a 600px canvas): max is ~2.2x the
-	// initial speed, reached after roughly two minutes.
-	baseSpeed = 1.0
-	maxSpeed  = 2.2
-	accel     = 0.0002
+	// maxSpeed leaves ~46 frames to cross the screen, the reaction time
+	// everything else is tuned around. Starting much slower than this
+	// stretches each enemy's pass, so the jump arc covers less of it.
+	baseSpeed = 1.29
+	maxSpeed  = 2.8
+	accel     = 0.000216
 
 	scoreEvery = 6 // frames per score point
 
-	// Wide or tall enemies unlock only once the scroll speed is high
-	// enough that a jump can physically clear them: the airborne
-	// window is fixed, so the wider the enemy, the faster it has to
-	// pass under the player.
-	bigCactusSpeed    = 1.15
-	doubleCactusSpeed = 1.4
-	birdSpeed         = 1.55
+	// Score at which the run stops getting harder. The speed ramp tops
+	// out around 1165, so the roster and the spacing carry the rest.
+	difficultyPeak = 2500
+
+	// Gap = (gapFloor + width*gapPerWidth) * speed + gapFlat, stretched
+	// by a random factor. A wide enemy earns a longer breather, and
+	// gapFlat — the term that does not scale with speed — buys fewer
+	// frames as the run speeds up, so gaps tighten in frames until the
+	// room between two enemies is a short hop rather than a full jump.
+	// gapFloor keeps something behind the narrow ones: a small cactus is
+	// 8px against a jump covering ~100. Calibrated to 38-54 frames
+	// between arrivals at the start and 28-38 at full speed; the
+	// difficulty then narrows only the stretch, never the floor.
+	gapFloor      = 6.4  // frames of scroll every enemy earns
+	gapPerWidth   = 1.65 // extra frames earned per px of width
+	gapFlat       = 16   // px of flat breather, the term speed erodes
+	gapJitterEasy = 1.5  // gap is stretched by up to this at difficulty 0
+	gapJitterHard = 1.2  // ...and by up to this at difficulty 1
+
+	// Cap on identical kinds in a row, so the run is never a metronome.
+	maxSameKind = 2
 
 	// Night mode: every invertEvery points the palette inverts for
 	// invertDuration frames (12s), mirroring the original.
@@ -59,10 +73,15 @@ type Game struct {
 	enemies []Enemy
 	spawnIn float64 // remaining px of scroll until next spawn
 
+	lastKind  enemyKind // kind of the last enemy spawned...
+	sameKinds int       // ...and how many in a row it has been
+
 	speed      float64
 	score      int
 	hiScore    int
 	nightTimer int // frames of night mode left
+
+	jumpHeld bool // jump button state on the previous frame
 
 	rng uint32
 }
@@ -98,6 +117,7 @@ func (g *Game) startRun() {
 	g.player = newPlayer()
 	g.enemies = g.enemies[:0]
 	g.spawnIn = ScreenWidth
+	g.lastKind, g.sameKinds = 0, 0
 	g.speed = baseSpeed
 	g.score = 0
 	g.nightTimer = 0
@@ -116,27 +136,30 @@ func (g *Game) HiScore() int { return g.hiScore }
 // render with an inverted palette while it is.
 func (g *Game) Night() bool { return g.nightTimer > 0 }
 
-// Update advances the game by one frame. jumpPressed reports whether
-// the jump button was pressed on this frame (edge, not level).
-func (g *Game) Update(jumpPressed bool) {
+// Update advances the game by one frame. jumpHeld is the button level,
+// not the press edge, because how long it stays down decides how high
+// the jump goes; the edge is derived here so no frontend tracks it.
+func (g *Game) Update(jumpHeld bool) {
+	pressed := jumpHeld && !g.jumpHeld
+	g.jumpHeld = jumpHeld
 	g.frame++
 	switch g.mode {
 	case ModeTitle:
-		if jumpPressed {
+		if pressed {
 			g.startRun()
 		}
 	case ModePlaying:
-		g.updatePlaying(jumpPressed)
+		g.updatePlaying(pressed, jumpHeld)
 	case ModeGameOver:
 		g.overFrame++
-		if jumpPressed && g.overFrame > restartDelay {
+		if pressed && g.overFrame > restartDelay {
 			g.startRun()
 		}
 	}
 }
 
-func (g *Game) updatePlaying(jumpPressed bool) {
-	g.player.Update(jumpPressed)
+func (g *Game) updatePlaying(pressed, held bool) {
+	g.player.Update(pressed, held, g.speed)
 
 	// Scroll, spawn, and cull enemies.
 	g.dist += g.speed
@@ -163,10 +186,7 @@ func (g *Game) updatePlaying(jumpPressed bool) {
 	if g.nightTimer > 0 {
 		g.nightTimer--
 	}
-	g.speed += accel
-	if g.speed > maxSpeed {
-		g.speed = maxSpeed
-	}
+	g.speed = speedAt(g.frame)
 
 	// Collision against the player's tight hit box.
 	px, py, pw, ph := g.player.HitRect()
@@ -187,25 +207,88 @@ func (g *Game) gameOver() {
 	}
 }
 
-// minSpawnGap is the smallest pixel gap between consecutive enemies.
-// It scales with speed (like the original) so the time between
-// obstacles never drops below what a full jump plus a landing needs:
-// 45*speed px ≈ 45 frames at any speed.
-func minSpawnGap(speed float64) float64 {
-	return 45*speed + 15
+// speedAt is the scroll speed on the given frame of a run.
+func speedAt(frame int) float64 {
+	return min(baseSpeed+accel*float64(frame), maxSpeed)
 }
 
-// spawnGapJitter is the random extra gap in pixels added on top of
-// minSpawnGap.
-const spawnGapJitter = 70
+// difficulty is a 0-to-1 ramp over the score, which keeps climbing
+// after the scroll speed has flattened out.
+func (g *Game) difficulty() float64 {
+	return min(float64(g.score)/difficultyPeak, 1)
+}
+
+// minSpawnGap and maxSpawnGap bracket the gap in px an enemy of the
+// given width earns behind it; the stretch picks between them.
+func minSpawnGap(width int, speed float64) float64 {
+	return (gapFloor+float64(width)*gapPerWidth)*speed + gapFlat
+}
+
+func maxSpawnGap(width int, speed, diff float64) float64 {
+	return minSpawnGap(width, speed) * lerp(gapJitterEasy, gapJitterHard, diff)
+}
+
+// minSpawnPitch is nose to nose: the enemy's own width, so the gap is
+// measured from its tail, plus the gap it earned.
+func minSpawnPitch(width int, speed float64) float64 {
+	return float64(width) + minSpawnGap(width, speed)
+}
+
+// spawnGap rolls the actual gap. The stretch is multiplicative, so the
+// spread stays proportional at every speed.
+func (g *Game) spawnGap(width int) float64 {
+	lo := minSpawnGap(width, g.speed)
+	hi := maxSpawnGap(width, g.speed, g.difficulty())
+	return lo + (hi-lo)*float64(g.rand(101))/100
+}
+
+// lerp interpolates from easy to hard over t in [0, 1].
+func lerp(easy, hard, t float64) float64 {
+	return easy + (hard-easy)*t
+}
 
 func (g *Game) spawn() {
-	kinds := 0
-	for kinds < len(enemyTable) && enemyTable[kinds].unlock <= g.speed {
-		kinds++
+	kind := g.pickKind(unlockedKinds(g.score), g.difficulty())
+	e := newEnemy(kind, ScreenWidth)
+	_, _, w, _ := e.Rect()
+	g.enemies = append(g.enemies, e)
+	g.spawnIn = float64(w) + g.spawnGap(w)
+
+	// A drifting bird would eat a gap already decided, so it pays with a
+	// head start, or, drifting back, with extra room behind it.
+	if b, ok := e.(*bird); ok {
+		if lead := b.drift(g.rand(2) == 0); lead > 0 {
+			b.x += lead
+		} else {
+			g.spawnIn -= lead
+		}
 	}
-	g.enemies = append(g.enemies, newEnemy(enemyKind(g.rand(kinds)), ScreenWidth))
-	g.spawnIn = minSpawnGap(g.speed) + float64(g.rand(spawnGapJitter))
+}
+
+// pickKind picks among the unlocked kinds. The table's tail is its
+// hard end, so rolling twice and keeping the higher roll — more often
+// as the difficulty rises — shifts the mix late without locking the
+// easy kinds out. Repeats are capped unless the roster is too small.
+func (g *Game) pickKind(kinds int, diff float64) enemyKind {
+	var k enemyKind
+	harder := int(diff * 1000)
+	for range kinds {
+		k = enemyKind(g.rand(kinds))
+		if g.rand(1000) < harder {
+			if k2 := enemyKind(g.rand(kinds)); k2 > k {
+				k = k2
+			}
+		}
+		if k != g.lastKind || g.sameKinds < maxSameKind {
+			break
+		}
+	}
+	if k == g.lastKind {
+		g.sameKinds++
+	} else {
+		g.lastKind, g.sameKinds = k, 1
+	}
+	return k
 }
 
 // rand returns a pseudo-random int in [0, n) using xorshift32,
