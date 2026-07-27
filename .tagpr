@@ -1,0 +1,16 @@
+# Config file for tagpr, in git config format.
+# See https://github.com/Songmu/tagpr for every key and its default.
+#
+# Only what this repository decides is written here; the rest is left at
+# tagpr's defaults, including the "major" and "minor" labels that pick
+# the bump on a release pull request.
+[tagpr]
+	releaseBranch = main
+	# Set explicitly so that nothing else in the tree can be picked up by
+	# tagpr's auto-detection.
+	versionFile = game/version.go
+	vPrefix = true
+	# Generated, so it cannot go stale; it costs one file's diff per
+	# release and buys a version history readable without GitHub.
+	changelog = true
+	release = true
