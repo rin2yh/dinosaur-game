@@ -7,11 +7,9 @@ const (
 
 	gravity = 0.22
 
-	// Jump velocity. The original tweaks it by the current scroll speed
-	// (INIITAL_JUMP_VELOCITY - speed/10), so a faster run jumps a little
-	// higher and the airborne window does not shrink in distance as the
-	// ground rushes by; jumpVelPerSpeed is that term scaled to this
-	// game's speed range.
+	// Jump velocity, with a term that leans on the current scroll speed
+	// so a faster run jumps a little higher and the airborne window does
+	// not shrink in distance as the ground rushes by.
 	jumpVel         = -3.6
 	jumpVelPerSpeed = -0.134
 
@@ -19,7 +17,6 @@ const (
 	// dropVel, which is what makes a tap a short hop and a held press a
 	// full jump. The cut only applies once the player has risen
 	// minJumpHeight, so even the shortest hop clears a small cactus.
-	// Ported from the original's endJump/DROP_VELOCITY/MIN_JUMP_HEIGHT.
 	dropVel       = -1.7
 	minJumpHeight = 9.4
 

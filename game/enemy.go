@@ -91,12 +91,11 @@ const (
 	birdFlyHeight = 4 // gap between a low bird and the ground
 
 	// Every bird flies a little off the scroll speed, half of them
-	// faster and half slower, as the original's pterodactyls do with
-	// their speedOffset. A fast one gives less warning than anything
-	// else in the game; a slow one drifts back into the gap behind it.
-	// Kept as a fraction of the scroll rather than the original's flat
-	// px/frame so it stays the same 12% at either end of the speed
-	// range, which is about where the original's lands.
+	// faster and half slower. A fast one gives less warning than
+	// anything else in the game; a slow one drifts back into the gap
+	// behind it. It is a fraction of the scroll rather than a flat
+	// px/frame, so the drift stays the same 12% at either end of the
+	// speed range.
 	birdSpeedOffset = 0.12
 )
 

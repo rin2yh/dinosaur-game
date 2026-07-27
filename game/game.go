@@ -13,15 +13,13 @@ const (
 const (
 	groundY = 56 // y of the ground line
 
-	// Speed curve scaled from the Chromium original (start 6, max 13,
-	// accel 0.001 px/frame^2 on a 600px canvas). maxSpeed is set so an
-	// enemy crosses this 128px screen in as many frames as one crosses
-	// the original's 600px canvas at its top speed, which is the real
-	// measure of how much reaction time the player gets. baseSpeed then
-	// follows from the original's ratio, 13/6: starting slower than that
-	// is what made the opening far gentler than the original's, since a
-	// sprite this size takes proportionally longer to pass the player.
-	// accel completes the ramp in the original's 7000 frames.
+	// Speed curve. maxSpeed is set so an enemy crosses the screen in
+	// about 46 frames, which is the reaction time everything else is
+	// tuned around. baseSpeed is 2.17x slower and accel walks between
+	// the two over 7000 frames. Starting slower than that ratio would
+	// stretch every enemy's pass across more frames, which makes the
+	// opening both gentler and, less obviously, tighter to time: the
+	// jump arc covers proportionally less of a slow enemy's passage.
 	baseSpeed = 1.29
 	maxSpeed  = 2.8
 	accel     = 0.000216
@@ -35,9 +33,8 @@ const (
 	// the rest of the way.
 	difficultyPeak = 2500
 
-	// Spawn spacing, shaped after the original's Obstacle.getGap:
-	// width*speed + minGap*gapCoefficient, stretched by a random factor
-	// up to MAX_GAP_COEFFICIENT. Two properties come with that shape.
+	// Spawn spacing: (gapFloor + width*gapPerWidth) * speed + gapFlat,
+	// stretched by a random factor. Two properties come with that shape.
 	//
 	// An enemy earns room in proportion to its own width, so a wide one
 	// is followed by a longer breather. And gapFlat, the one term that
@@ -47,15 +44,12 @@ const (
 	// between two enemies is a short hop and a landing rather than a
 	// full jump.
 	//
-	// gapFloor is what every enemy earns before its width is counted.
-	// The original has no equivalent because its narrowest obstacle is
-	// already wide relative to its canvas; a small cactus here is 8px
-	// against a jump that covers about 100, so width alone would leave
-	// almost nothing behind the narrow ones.
+	// gapFloor is what every enemy earns before its width is counted. A
+	// small cactus is 8px against a jump that covers about 100, so
+	// width alone would leave almost nothing behind the narrow ones.
 	//
-	// The three are calibrated so the frames between arrivals land where
-	// the original's do: 38 to 54 at the start against 28 to 38 at full
-	// speed, for the original's 35-49 and 25-37. What is left of the
+	// The three are calibrated so the frames between arrivals run 38 to
+	// 54 at the start and 28 to 38 at full speed. What is left of the
 	// difficulty ramp only narrows the random stretch, so a long run
 	// meets the tight end more and more often while the floor itself
 	// never moves — pairSlack in the tests pins where that floor is.
@@ -65,9 +59,8 @@ const (
 	gapJitterEasy = 1.5  // gap is stretched by up to this at difficulty 0
 	gapJitterHard = 1.2  // ...and by up to this at difficulty 1
 
-	// The original refuses a third obstacle of the same type in a row
-	// (MAX_OBSTACLE_DUPLICATION), so a run never settles into a
-	// metronome of identical jumps.
+	// How many of the same kind may spawn in a row, so a run never
+	// settles into a metronome of identical jumps.
 	maxSameKind = 2
 
 	// Night mode: every invertEvery points the palette inverts for
@@ -234,10 +227,10 @@ func (g *Game) gameOver() {
 	}
 }
 
-// speedAt returns the scroll speed on the given frame of a run: the
-// original's constant acceleration up to a cap. Stating it as a
-// function of the frame rather than accumulating it keeps one
-// definition of the ramp for the game and the tests to share.
+// speedAt returns the scroll speed on the given frame of a run:
+// constant acceleration up to a cap. Stating it as a function of the
+// frame rather than accumulating it keeps one definition of the ramp
+// for the game and the tests to share.
 func speedAt(frame int) float64 {
 	return min(baseSpeed+accel*float64(frame), maxSpeed)
 }
@@ -261,16 +254,16 @@ func maxSpawnGap(width int, speed, diff float64) float64 {
 	return minSpawnGap(width, speed) * lerp(gapJitterEasy, gapJitterHard, diff)
 }
 
-// spawnPitch is how far the scroll carries between this enemy entering
-// and the next one doing so: its own width, so the gap is measured from
-// its tail as in the original, plus the gap it earned.
+// minSpawnPitch is how far the scroll carries between this enemy
+// entering and the next one doing so: its own width, so the gap is
+// measured from its tail rather than its nose, plus the gap it earned.
 func minSpawnPitch(width int, speed float64) float64 {
 	return float64(width) + minSpawnGap(width, speed)
 }
 
-// spawnGap rolls the actual gap, the original's multiplicative jitter:
-// the spread stays proportional at every speed instead of mattering
-// less and less as the gaps grow.
+// spawnGap rolls the actual gap. The stretch is multiplicative so the
+// spread stays proportional at every speed, instead of mattering less
+// and less as the gaps grow.
 func (g *Game) spawnGap(width int) float64 {
 	lo := minSpawnGap(width, g.speed)
 	hi := maxSpawnGap(width, g.speed, g.difficulty())
@@ -308,8 +301,8 @@ func (g *Game) spawn() {
 // roster: rolling twice and keeping the higher roll — with a
 // probability that grows with the difficulty — shifts the mix towards
 // the newly unlocked kinds late in a run without ever locking the easy
-// ones out. Runs of the same kind are capped the way the original caps
-// them, except when the roster is too small to offer an alternative.
+// ones out. Runs of the same kind are capped at maxSameKind, except
+// when the roster is too small to offer an alternative.
 func (g *Game) pickKind(kinds int, diff float64) enemyKind {
 	var k enemyKind
 	harder := int(diff * 1000)

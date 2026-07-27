@@ -62,9 +62,9 @@ func TestPlayerJumpAndLand(t *testing.T) {
 	}
 }
 
-// TestJumpHeightFollowsHold is the guard on the ported variable-height
-// jump: how long the button stays down has to decide how high and how
-// long the player flies, or the tight late-game gaps have no answer.
+// TestJumpHeightFollowsHold is the guard on the variable-height jump:
+// how long the button stays down has to decide how high and how long
+// the player flies, or the tight late-game gaps have no answer.
 func TestJumpHeightFollowsHold(t *testing.T) {
 	fly := func(hold int) (peak float64, frames int) {
 		g := newRun(1)
@@ -344,10 +344,10 @@ func TestEnemyTableUnlocksSorted(t *testing.T) {
 }
 
 // pairSlack is the timing slop the tightest spawn gap has to leave on
-// every press. The original leaves about this much at its own tightest
-// draw, and this game is calibrated to sit alongside it: asking for
-// more is what made an earlier cut of this noticeably gentler than the
-// original, and asking for less would be trusting frame-perfect play.
+// every press, and the bar the gap constants are calibrated against.
+// Asking for more visibly flattens the late game — an earlier cut of
+// this used ±5 and the tight end simply never arrived — while asking
+// for less would be trusting frame-perfect play.
 const pairSlack = 3
 
 // TestBackToBackEnemiesClearable guards the spawn-gap formula at its
