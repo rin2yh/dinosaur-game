@@ -44,8 +44,8 @@ const (
 	// Cap on identical kinds in a row, so the run is never a metronome.
 	maxSameKind = 2
 
-	// Night mode: every invertEvery points the palette inverts for
-	// invertDuration frames (12s), mirroring the original.
+	// Night mode: the palette inverts for invertDuration frames every
+	// invertEvery points, which at scoreEvery is about 70s of play.
 	invertEvery    = 700
 	invertDuration = 12 * 60
 
@@ -161,7 +161,6 @@ func (g *Game) Update(jumpHeld bool) {
 func (g *Game) updatePlaying(pressed, held bool) {
 	g.player.Update(pressed, held, g.speed)
 
-	// Scroll, spawn, and cull enemies.
 	g.dist += g.speed
 	g.spawnIn -= g.speed
 	if g.spawnIn <= 0 {
@@ -176,7 +175,6 @@ func (g *Game) updatePlaying(pressed, held bool) {
 	}
 	g.enemies = live
 
-	// Score and difficulty.
 	if g.frame%scoreEvery == 0 {
 		g.score++
 		if g.score%invertEvery == 0 {
@@ -188,7 +186,6 @@ func (g *Game) updatePlaying(pressed, held bool) {
 	}
 	g.speed = speedAt(g.frame)
 
-	// Collision against the player's tight hit box.
 	px, py, pw, ph := g.player.HitRect()
 	for _, e := range g.enemies {
 		ex, ey, ew, eh := e.Rect()

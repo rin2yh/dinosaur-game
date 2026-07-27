@@ -7,8 +7,10 @@
 <style>
   /* Ebitengine sizes its canvas from <body>, so the body *is* the game area.
      Give it a fixed size instead of the whole viewport: the 128x64 screen at
-     4x (512x256) puts the sprites at roughly the original T-Rex Runner scale.
-     Shrink to fit narrow (100vw) or short (200vh, the 2:1 aspect) viewports. */
+     4x (512x256) fits a laptop window with room to spare, and an integer
+     scale is what keeps the pixelated rendering below from drawing some game
+     pixels wider than others. Shrink to fit narrow (100vw) or short (200vh,
+     the 2:1 aspect) viewports. */
   html {
     height: 100%;
     display: flex;
