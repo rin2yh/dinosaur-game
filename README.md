@@ -42,28 +42,6 @@ mise run flash-firmware # zero-kb02 に書き込み
 
 公開先: https://rin2yh.github.io/dinosaur-game/
 
-## リリース
-
-バージョンは [tagpr](https://github.com/Songmu/tagpr) が管理します。`main` への push で `.github/workflows/release.yml` がリリース PR を作成・更新し、その PR をマージした時点でタグが打たれて GitHub Release が作られます。手で `git tag` を打つ必要はありません（feature branch に打つと squash マージ後にコミットが `main` の履歴から外れ、タグが宙に浮きます）。
-
-- タグは `v0.1.0` 形式。`game.Version`（`game/version.go`）と `CHANGELOG.md` はリリース PR の中で tagpr が書き換えるので、手では触りません
-- バンプはリリース PR に貼るラベルで決まります。既定はパッチで、`minor` でマイナー、`major` でメジャー
-- 初回のリリース PR には `minor` を貼って `v0.1.0` から始めてください（既定のままだと `v0.0.1` になります）
-
-バンプの基準は次のとおりです。0.x のうちはメジャーを上げず、破壊的変更もマイナーに入れます。
-
-| 区分 | 対象 |
-| --- | --- |
-| メジャー | `game` パッケージの前提（下記）が変わるとき。このリポジトリの外でフロントエンドを書いている人のコードが壊れる変更 |
-| マイナー | プレイして違いが分かる変更。難易度調整、新しい敵、操作の変更、対応ボードの追加 |
-| パッチ | プレイヤーから見て何も変わらないもの。バグ修正、リファクタ、README や CI |
-
-1.0 は機能が揃ったかどうかではなく、`game` パッケージの前提をもう動かさないと判断できたときに切ります。当面は 0.x のままです。
-
-`game.Version`（`game/version.go`）はまだどこからも読んでいない定数です。リリース間の `main` では直前のリリース版を指すので、実機に版を出したくなったらこれを読んでください。
-
-初回のみ、リポジトリの Settings → Actions → General → Workflow permissions で「Allow GitHub Actions to create and approve pull requests」を有効にし（無効のままだと tagpr がリリース PR を作れません）、バンプ用の `major` / `minor` ラベルを作成してください。
-
 ## 構成と移植性
 
 ゲーム本体はエンジン非依存で、Ebitengine と [sago35/koebiten](https://github.com/sago35/koebiten) の 2 つのフロントエンドがあります。
