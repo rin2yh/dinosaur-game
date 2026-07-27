@@ -44,7 +44,7 @@ mise run flash-firmware # zero-kb02 に書き込み
 
 ## リリース
 
-バージョンは [tagpr](https://github.com/Songmu/tagpr) が管理します。`main` への push で `.github/workflows/tagpr.yml` がリリース PR を作成・更新し、その PR をマージした時点でタグが打たれて GitHub Release が作られます。手で `git tag` を打つ必要はありません（feature branch に打つと squash マージ後にコミットが `main` の履歴から外れ、タグが宙に浮きます）。
+バージョンは [tagpr](https://github.com/Songmu/tagpr) が管理します。`main` への push で `.github/workflows/release.yml` がリリース PR を作成・更新し、その PR をマージした時点でタグが打たれて GitHub Release が作られます。手で `git tag` を打つ必要はありません（feature branch に打つと squash マージ後にコミットが `main` の履歴から外れ、タグが宙に浮きます）。
 
 - タグは `v0.1.0` 形式。`game.Version`（`game/version.go`）と `CHANGELOG.md` はリリース PR の中で tagpr が書き換えるので、手では触りません
 - バンプはリリース PR に貼るラベルで決まります。既定はパッチで、`minor` でマイナー、`major` でメジャー

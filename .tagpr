@@ -1,9 +1,7 @@
-# Config file for tagpr, in git config format. Only what this repository
-# decides is set here; see https://github.com/Songmu/tagpr for the rest.
+# tagpr config, in git config format. Unset keys keep tagpr's defaults.
 [tagpr]
-	# Pinned so auto-detection cannot pick up another file.
+	# Pinned against auto-detection.
 	versionFile = game/version.go
 	vPrefix = true
-	# Same as the default, but it was the open question: generated, so it
-	# cannot go stale, at one file's diff per release.
+	# Default, but written down: it was the open question.
 	changelog = true

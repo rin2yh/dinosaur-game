@@ -1,4 +1,4 @@
-name: tagpr
+name: Tag releases
 
 on:
   push:
@@ -7,13 +7,13 @@ on:
 permissions: {}
 
 concurrency:
-  group: tagpr
+  group: release
   cancel-in-progress: false
 
 jobs:
-  tagpr:
+  release:
     runs-on: ubuntu-latest
-    # issues: read is for the bump labels on the release PR.
+    # issues: read is for the bump labels.
     permissions:
       contents: write
       pull-requests: write
@@ -21,9 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # tagpr feeds the token to git itself.
+          # tagpr supplies its own token.
           persist-credentials: false
-          # tagpr unshallows on every run anyway.
+          # tagpr unshallows anyway.
           fetch-depth: 0
 
       - uses: Songmu/tagpr@d1b8138b7a31075141b6cd64103de9485ced7ac9 # v1.20.1
