@@ -3,5 +3,5 @@
 	# Pinned against auto-detection.
 	versionFile = game/version.go
 	vPrefix = true
-	# Default, but written down: it was the open question.
-	changelog = true
+	# Release notes stay in the release PR and the GitHub Release.
+	changelog = false
