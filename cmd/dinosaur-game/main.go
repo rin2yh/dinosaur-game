@@ -13,8 +13,9 @@ import (
 	"github.com/rin2yh/dinosaur-game/game"
 )
 
-// bg is repeated as the page background in web/index.html; the canvas
-// is letterboxed there, and the seam shows if the two drift apart.
+// The palette lives here alone. The web build letterboxes the canvas,
+// so the page background has to match whichever entry the canvas was
+// cleared with; setPageBackground pushes it out to the document.
 var (
 	bg = [4]byte{0xf7, 0xf7, 0xf7, 0xff}
 	fg = [4]byte{0x53, 0x53, 0x53, 0xff}
@@ -57,13 +58,15 @@ func (a *app) Update() error {
 }
 
 func (a *app) Draw(screen *ebiten.Image) {
+	// Night mode swaps the two entries; the page around the canvas has to
+	// swap with them, or the border stays light for the whole 12 seconds.
+	paper, ink := bg, fg
 	if a.g.Night() {
-		a.fb.fg = bg
-		a.fb.clear(fg)
-	} else {
-		a.fb.fg = fg
-		a.fb.clear(bg)
+		paper, ink = fg, bg
 	}
+	a.fb.fg = ink
+	a.fb.clear(paper)
+	setPageBackground(paper)
 	a.g.Draw(&a.fb)
 	screen.WritePixels(a.fb.pix)
 }

@@ -16,7 +16,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f7f7f7;
+    /* No background here: main.go sets it on this element from the same
+       palette it clears the canvas with, so the border around the canvas
+       follows the game into night mode. Until the WASM is up the page is
+       empty anyway, canvas included, so there is nothing to mismatch. */
     overflow: hidden;
   }
   body {
