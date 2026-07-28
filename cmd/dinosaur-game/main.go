@@ -73,6 +73,11 @@ func (a *app) Layout(outsideWidth, outsideHeight int) (int, int) {
 }
 
 func main() {
+	// 6x rather than the 4x web/index.html settles for: that canvas shares a
+	// page, this window doesn't. Sizes are in device-independent pixels, so a
+	// display scale that isn't whole (125%, say) still lands this build on a
+	// fractional ratio, where Ebitengine filters instead of copying pixels.
+	// Only the web side rounds that away today.
 	ebiten.SetWindowSize(game.ScreenWidth*6, game.ScreenHeight*6)
 	ebiten.SetWindowTitle("Dinosaur Game")
 	a := &app{
