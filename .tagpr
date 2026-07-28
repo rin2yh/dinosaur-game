@@ -5,3 +5,4 @@
 	vPrefix = true
 	# Release notes stay in the release PR and the GitHub Release.
 	changelog = false
+	releaseBranch = main
