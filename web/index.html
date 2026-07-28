@@ -6,11 +6,9 @@
 <title>Dinosaur Game</title>
 <style>
   /* Ebitengine sizes its canvas from <body>, so the body *is* the game area.
-     512x256 is the 128x64 screen at 4x, which fits a laptop window with room
-     to spare; shrink for narrow (100vw) or short (200vh, the 2:1 aspect)
-     viewports. The ceiling is lower than the desktop build's because the
-     canvas shares a page here. The script below trims this width further;
-     this rule is what runs without it. */
+     512px caps the 128x64 screen at 4x, lower than the desktop build's
+     ceiling because this canvas shares a page. The script below rounds the
+     result down; this rule is what runs without it, and owns the sizes. */
   html {
     height: 100%;
     display: flex;
@@ -27,8 +25,8 @@
     height: auto !important;
   }
   canvas {
-    /* Ebitengine keeps the backing store on the device pixel grid, so this
-       only bites if the two drift for a frame, e.g. mid-zoom. */
+    /* Near-inert: Ebitengine keeps the backing store on the device pixel
+       grid. This only bites mid-zoom, before it catches up. */
     image-rendering: pixelated;
   }
 </style>
@@ -37,17 +35,13 @@
 <script>
   // Ebitengine copies the 128x64 offscreen pixel for pixel only at a
   // whole-number ratio; otherwise it filters, and game pixels stop being the
-  // same size (measured at a 390px viewport, where the rule above gives
-  // 3.05x: 1px strokes came out as a mix of 3px and 4px). So round the body
-  // to a whole multiple of the screen, in device pixels.
-  //
-  // Exact whenever devicePixelRatio is an integer. Ebitengine reads
-  // body.clientWidth, which is whole CSS pixels, so a fractional ratio can
-  // land a device pixel short -- close enough to leave nothing to blend.
+  // same size -- at a 390px viewport the rule above gives 3.05x, which drew
+  // 1px strokes as a mix of 3px and 4px. Exact whenever devicePixelRatio is
+  // an integer; a fractional one can still land a device pixel short.
   const fit = () => {
-    const dpr = window.devicePixelRatio;
-    const limit = Math.min(512, innerWidth, 2 * innerHeight) * dpr;
-    const scale = Math.max(1, Math.floor(limit / 128));
+    document.body.style.width = ""; // let the CSS rule answer first
+    const dpr = devicePixelRatio;
+    const scale = Math.floor((document.body.clientWidth * dpr) / 128) || 1;
     document.body.style.width = Math.floor((128 * scale) / dpr) + "px";
   };
   fit();
