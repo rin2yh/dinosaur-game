@@ -73,6 +73,13 @@ func (a *app) Layout(outsideWidth, outsideHeight int) (int, int) {
 }
 
 func main() {
+	// 6x (768x384) is a comfortable standalone window. It is deliberately
+	// larger than the 4x ceiling in web/index.html, which has to leave room
+	// for the page around it; nothing here is competing for the space.
+	// Whole-number scales matter to Ebitengine either way: at a fractional
+	// one it stops copying the offscreen pixel for pixel and filters it
+	// instead. The window is not resizable (Ebitengine's default), so this
+	// ratio is the only one the desktop build ever draws at.
 	ebiten.SetWindowSize(game.ScreenWidth*6, game.ScreenHeight*6)
 	ebiten.SetWindowTitle("Dinosaur Game")
 	a := &app{
