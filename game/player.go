@@ -58,8 +58,9 @@ func (p *Player) Update(pressed, held bool, speed float64) {
 	}
 }
 
-// HitRect returns the tighter box used for collisions. It excludes
-// the tail and the sprite fringe so near misses feel fair.
+// HitRect returns the tighter box used for collisions: 4 columns of
+// tail on the left, 1 of sprite fringe on the right, and a row off the
+// top and bottom, so near misses feel fair.
 func (p *Player) HitRect() (x, y, w, h int) {
 	return playerX + 4, int(p.y) + 1, playerW - 5, playerH - 2
 }
