@@ -48,10 +48,6 @@ mise run flash-firmware # zero-kb02 に書き込み
 
 ```
 game/            エンジン非依存のゲームロジックと描画（どのエンジンにも依存しない）
-  game.go        状態遷移・物理・障害物・当たり判定・スコア
-  draw.go        Display インターフェースへの描画
-  sprites.go     1bit ビットマップスプライト
-  font.go        3x5 ピクセルフォント
 cmd/
   dinosaur-game/ Ebitengine フロントエンド（デスクトップと WASM、入力と RGBA フレームバッファのみ）
   firmware/      koebiten フロントエンド（マイコン実機向け、TinyGo でビルド）
