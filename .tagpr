@@ -1,0 +1,7 @@
+# tagpr config, in git config format. Unset keys keep tagpr's defaults.
+[tagpr]
+	# Pinned against auto-detection.
+	versionFile = game/version.go
+	vPrefix = true
+	# Release notes stay in the release PR and the GitHub Release.
+	changelog = false
