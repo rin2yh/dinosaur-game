@@ -5,7 +5,9 @@
 package main
 
 import (
+	"image/color"
 	"log"
+	"math"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -13,8 +15,9 @@ import (
 	"github.com/rin2yh/dinosaur-game/game"
 )
 
-// bg is repeated as the page background in web/index.html; the canvas
-// is letterboxed there, and the seam shows if the two drift apart.
+// bg fills the letterbox DrawFinalScreen leaves around the game, and
+// web/index.html repeats it behind both the page and the canvas. A seam
+// shows wherever the copies drift apart.
 var (
 	bg = [4]byte{0xf7, 0xf7, 0xf7, 0xff}
 	fg = [4]byte{0x53, 0x53, 0x53, 0xff}
@@ -72,12 +75,39 @@ func (a *app) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return game.ScreenWidth, game.ScreenHeight
 }
 
+// DrawFinalScreen scales the game by a whole number of device pixels.
+// Ebitengine's default copies the offscreen pixel for pixel at a whole
+// ratio and filters at any other, which draws a 1px stroke as a mix of
+// widths. A window under a 125% display scale and a browser under a
+// fractional devicePixelRatio both land on a fractional ratio, and
+// neither can be rounded off from outside the process, so both frontends
+// round here instead. The cost is the letterbox the leftover becomes.
+func (a *app) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image, geoM ebiten.GeoM) {
+	scale := geoM.Element(0, 0)
+	if scale < 1 {
+		// Under one device pixel per game pixel there is nothing to
+		// round down to; let Ebitengine shrink the offscreen as usual.
+		ebiten.DefaultDrawFinalScreen(screen, offscreen, geoM)
+		return
+	}
+	scale = math.Floor(scale)
+
+	screen.Fill(color.RGBA{bg[0], bg[1], bg[2], bg[3]})
+	b := screen.Bounds()
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(scale, scale)
+	op.GeoM.Translate(
+		math.Floor((float64(b.Dx())-game.ScreenWidth*scale)/2),
+		math.Floor((float64(b.Dy())-game.ScreenHeight*scale)/2),
+	)
+	screen.DrawImage(offscreen, op)
+}
+
 func main() {
 	// 6x rather than the 4x web/index.html settles for: that canvas shares a
 	// page, this window doesn't. Sizes are in device-independent pixels, so a
-	// display scale that isn't whole (125%, say) still lands this build on a
-	// fractional ratio, where Ebitengine filters instead of copying pixels.
-	// Only the web side rounds that away today.
+	// display scale that isn't whole (125%, say) lands the framebuffer on a
+	// fractional multiple of these; DrawFinalScreen rounds it back down.
 	ebiten.SetWindowSize(game.ScreenWidth*6, game.ScreenHeight*6)
 	ebiten.SetWindowTitle("Dinosaur Game")
 	a := &app{

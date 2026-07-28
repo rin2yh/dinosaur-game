@@ -7,8 +7,9 @@
 <style>
   /* Ebitengine sizes its canvas from <body>, so the body *is* the game area.
      512px caps the 128x64 screen at 4x, lower than the desktop build's
-     ceiling because this canvas shares a page. The script below rounds the
-     result down; this rule is what runs without it, and owns the sizes. */
+     ceiling because this canvas shares a page. Anything short of a whole
+     multiple of 128 becomes letterboxing inside the canvas: the Go side
+     rounds the scale down and fills the rest with the background below. */
   html {
     height: 100%;
     display: flex;
@@ -28,25 +29,15 @@
     /* Near-inert: Ebitengine keeps the backing store on the device pixel
        grid. This only bites mid-zoom, before it catches up. */
     image-rendering: pixelated;
+    /* The backing store is truncated to whole device pixels, so a
+       fractional devicePixelRatio can leave the element a half pixel
+       taller than what it has to draw. Painting that sliver keeps it from
+       coming out as a grey hairline along the edge. */
+    background: #f7f7f7;
   }
 </style>
 </head>
 <body>
-<script>
-  // Ebitengine copies the 128x64 offscreen pixel for pixel only at a
-  // whole-number ratio; otherwise it filters, and game pixels stop being the
-  // same size -- at a 390px viewport the rule above gives 3.05x, which drew
-  // 1px strokes as a mix of 3px and 4px. Exact whenever devicePixelRatio is
-  // an integer; a fractional one can still land a device pixel short.
-  const fit = () => {
-    document.body.style.width = ""; // let the CSS rule answer first
-    const dpr = devicePixelRatio;
-    const scale = Math.floor((document.body.clientWidth * dpr) / 128) || 1;
-    document.body.style.width = Math.floor((128 * scale) / dpr) + "px";
-  };
-  fit();
-  addEventListener("resize", fit);
-</script>
 <script src="wasm_exec.js"></script>
 <script>
   const go = new Go();
