@@ -36,6 +36,11 @@ var (
 	nightBG = pixel.NewMonochrome(dayFG.R, dayFG.G, dayFG.B)
 )
 
+// framesPerTick is how many game frames one koebiten tick covers.
+// koebiten ticks every 32ms (~31 TPS) and the game assumes 60, so two
+// frames a tick keeps wall-clock speed.
+const framesPerTick = 2
+
 // oledDisplay implements game.Display by forwarding each pixel to the
 // hardware display in the current foreground color.
 type oledDisplay struct {
@@ -50,6 +55,7 @@ func (o *oledDisplay) SetPixel(x, y int) {
 type app struct {
 	g    *game.Game
 	disp oledDisplay
+	spk  speaker
 	keys []koebiten.Key
 }
 
@@ -61,10 +67,14 @@ func (a *app) Update() error {
 	a.keys = koebiten.AppendPressedKeys(a.keys[:0])
 	held := len(a.keys) > 0
 
-	// koebiten ticks every 32ms (~31 TPS) while the game assumes 60
-	// TPS, so step the game twice per tick to keep wall-clock speed.
-	a.g.Update(held)
-	a.g.Update(held)
+	// The effects are per-frame, so the speaker hears from every step
+	// rather than once a tick, which would drop whatever landed on the
+	// step that went unread. Written as a loop so that stays true by
+	// construction rather than by two lines staying in step.
+	for range framesPerTick {
+		a.g.Update(held)
+		a.spk.play(a.g.Sounds())
+	}
 	return nil
 }
 
@@ -94,6 +104,7 @@ func main() {
 		// mixes the player's press timing in when a run starts.
 		g:    game.New(1),
 		disp: oledDisplay{d: hardware.Device.GetDisplay()},
+		spk:  newSpeaker(),
 		keys: make([]koebiten.Key, 0, koebiten.KeyMax+1),
 	}
 	if err := koebiten.RunGame(a); err != nil {

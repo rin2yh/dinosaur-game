@@ -17,6 +17,10 @@ run = [
 description = "zero-kb02 に書き込み"
 run = "tinygo flash --target ./targets/zero-kb02.json --size short ./cmd/firmware"
 
+[tasks.flash-firmware-conf2025badge]
+description = "conf2025badge に書き込み（ブザーで効果音が鳴る）"
+run = "tinygo flash --target ./targets/conf2025badge.json --size short ./cmd/firmware"
+
 [tasks.serve]
 description = "wasmserve で http://localhost:8000 に配信（リロードで再ビルド）"
 run = "go tool wasmserve -http=:8000 ./cmd/dinosaur-game"
