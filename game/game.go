@@ -81,6 +81,8 @@ type Game struct {
 	hiScore    int
 	nightTimer int // frames of night mode left
 
+	sounds Sound // effects triggered by the current frame
+
 	jumpHeld bool // jump button state on the previous frame
 
 	rng uint32
@@ -143,6 +145,7 @@ func (g *Game) Update(jumpHeld bool) {
 	pressed := jumpHeld && !g.jumpHeld
 	g.jumpHeld = jumpHeld
 	g.frame++
+	g.sounds = 0
 	switch g.mode {
 	case ModeTitle:
 		if pressed {
@@ -159,7 +162,9 @@ func (g *Game) Update(jumpHeld bool) {
 }
 
 func (g *Game) updatePlaying(pressed, held bool) {
-	g.player.Update(pressed, held, g.speed)
+	if g.player.Update(pressed, held, g.speed) {
+		g.sounds |= SoundJump
+	}
 
 	g.dist += g.speed
 	g.spawnIn -= g.speed
@@ -177,6 +182,9 @@ func (g *Game) updatePlaying(pressed, held bool) {
 
 	if g.frame%scoreEvery == 0 {
 		g.score++
+		if g.score%pointEvery == 0 {
+			g.sounds |= SoundPoint
+		}
 		if g.score%invertEvery == 0 {
 			g.nightTimer = invertDuration
 		}
@@ -199,6 +207,7 @@ func (g *Game) updatePlaying(pressed, held bool) {
 func (g *Game) gameOver() {
 	g.mode = ModeGameOver
 	g.overFrame = 0
+	g.sounds |= SoundDie
 	if g.score > g.hiScore {
 		g.hiScore = g.score
 	}

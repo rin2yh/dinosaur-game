@@ -1,7 +1,8 @@
 // Command dinosaur-game is the Ebitengine frontend for the dinosaur
 // game, covering both desktop and the browser via WebAssembly. All game
 // logic and rendering live in the engine-agnostic game package; this
-// file only wires up input and the framebuffer.
+// file only wires up input and the framebuffer, and sound.go plays the
+// effects that package asks for.
 package main
 
 import (
@@ -42,6 +43,7 @@ func (f *frameBuffer) clear(bg [4]byte) {
 type app struct {
 	g        *game.Game
 	fb       frameBuffer
+	spk      *speaker
 	touchIDs []ebiten.TouchID
 }
 
@@ -53,6 +55,7 @@ func (a *app) Update() error {
 		ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) ||
 		len(ebiten.AppendTouchIDs(a.touchIDs[:0])) > 0
 	a.g.Update(jump)
+	a.spk.play(a.g.Sounds())
 	return nil
 }
 
@@ -81,8 +84,9 @@ func main() {
 	ebiten.SetWindowSize(game.ScreenWidth*6, game.ScreenHeight*6)
 	ebiten.SetWindowTitle("Dinosaur Game")
 	a := &app{
-		g:  game.New(uint32(time.Now().UnixNano())),
-		fb: frameBuffer{pix: make([]byte, game.ScreenWidth*game.ScreenHeight*4)},
+		g:   game.New(uint32(time.Now().UnixNano())),
+		fb:  frameBuffer{pix: make([]byte, game.ScreenWidth*game.ScreenHeight*4)},
+		spk: newSpeaker(),
 	}
 	if err := ebiten.RunGame(a); err != nil {
 		log.Fatal(err)

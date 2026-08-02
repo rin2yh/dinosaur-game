@@ -39,10 +39,13 @@ func (p *Player) onGround() bool {
 }
 
 // Update advances the player physics by one frame. pressed is the
-// press edge, held the button level.
-func (p *Player) Update(pressed, held bool, speed float64) {
+// press edge, held the button level. It reports whether this frame is
+// the one a jump left the ground, which is what the jump sound rides
+// on: a press with nowhere to go must not make a noise.
+func (p *Player) Update(pressed, held bool, speed float64) (jumped bool) {
 	if pressed && p.onGround() {
 		p.velY = jumpVel + jumpVelPerSpeed*speed
+		jumped = true
 	}
 	// Checked against the level every frame, not the release edge: a
 	// release below minJumpHeight would otherwise become a full jump,
@@ -56,6 +59,7 @@ func (p *Player) Update(pressed, held bool, speed float64) {
 		p.y = playerStandY
 		p.velY = 0
 	}
+	return jumped
 }
 
 // HitRect returns the tighter box used for collisions: 4 columns of

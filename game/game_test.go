@@ -508,6 +508,88 @@ func TestNightModeTogglesAndReverts(t *testing.T) {
 	}
 }
 
+// step is one entry in a sound script: what the frame needs set up
+// beforehand, the button level on it, and the exact set of effects it
+// has to produce. A step with frames > 1 repeats, expecting the same
+// set every time, which is how a stretch of silence is written.
+type step struct {
+	name   string
+	before func(*Game) // optional
+	jump   bool
+	frames int // 0 means one frame
+	want   Sound
+}
+
+// playScript runs the steps in order and checks each frame's sounds.
+// The whole set is compared, not a single bit: a test that only looks
+// for the effect it is about would not notice another one firing
+// alongside it.
+func playScript(t *testing.T, g *Game, steps []step) {
+	t.Helper()
+	for _, s := range steps {
+		if s.before != nil {
+			s.before(g)
+		}
+		for i := range max(s.frames, 1) {
+			g.Update(s.jump)
+			if got := g.Sounds(); got != s.want {
+				t.Fatalf("%s (frame %d): sounds = %#b, want %#b", s.name, i, got, s.want)
+			}
+		}
+	}
+}
+
+// TestJumpSoundFollowsTheJump checks the jump blip tracks what the
+// player actually did, not what they pressed: a press that finds the
+// dinosaur already in the air changes nothing on screen, so it must
+// not make a noise either.
+func TestJumpSoundFollowsTheJump(t *testing.T) {
+	playScript(t, newPlaying(t), []step{
+		{name: "press on the ground", jump: true, want: SoundJump},
+		{name: "the frame after the jump", want: 0},
+		{name: "press while airborne", jump: true, want: 0},
+	})
+}
+
+// TestSoundsAreSilentOutsideAJump guards the other end: the title and
+// game over screens take the same button, and neither is a jump.
+func TestSoundsAreSilentOutsideAJump(t *testing.T) {
+	playScript(t, New(1), []step{
+		{name: "press on the title screen", jump: true, want: 0},
+		{name: "running into an enemy", want: SoundDie, before: func(g *Game) {
+			g.enemies = append(g.enemies, newEnemy(cactusSmall, playerX))
+		}},
+		{name: "sitting on the game over screen", frames: restartDelay + 1, want: 0},
+		{name: "press to restart", jump: true, want: 0},
+	})
+}
+
+// TestPointSoundOnMilestones checks the chime rings once per
+// pointEvery points and stays quiet in between. The run is a whole
+// number of scoreEvery periods long, so it scores pointEvery+1 points
+// whatever frame it starts on, crossing exactly two milestones: the
+// one it starts a point short of, and the one a hundred points later.
+func TestPointSoundOnMilestones(t *testing.T) {
+	const want = 2
+
+	g := newPlaying(t)
+	g.score = pointEvery - 1
+	chimes := 0
+	for range scoreEvery * (pointEvery + 1) {
+		g.enemies = g.enemies[:0] // nothing to run into
+		g.Update(false)
+		if g.Sounds().Has(SoundPoint) {
+			chimes++
+			if g.Score()%pointEvery != 0 {
+				t.Fatalf("chime at score %d, not a multiple of %d", g.Score(), pointEvery)
+			}
+		}
+	}
+	if chimes != want {
+		t.Errorf("%d chimes while scoring %d points, want %d", chimes, pointEvery+1, want)
+	}
+}
+
 // boundsDisplay fails the test if the game draws outside the screen.
 type boundsDisplay struct {
 	t *testing.T
