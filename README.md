@@ -30,8 +30,17 @@ mise run serve                # http://localhost:8000 に Web 版を配信
 - [効果音](docs/sound.md) — サイン波から生成している理由と、生成・再生の担当箇所
 - [開発環境](docs/development.md) — OS ごとの前提、タスク、デプロイ
 - [構成と移植性](docs/architecture.md) — `game` パッケージの制約と理由、ファームウェア固有の調整
-- [ライセンス](docs/licenses.md) — 依存ライブラリのライセンス
 
 ## ライセンス
 
-[MIT License](LICENSE) です。依存の内訳は [ライセンス](docs/licenses.md) にあります。
+[MIT License](LICENSE) です。
+
+直接依存は `go.mod` を参照してください。いずれも許容的なライセンスで、再配布時はそれぞれの著作権表示を含める必要があります。
+
+| 依存 | ライセンス |
+| --- | --- |
+| [hajimehoshi/ebiten](https://github.com/hajimehoshi/ebiten) | Apache-2.0 |
+| [sago35/koebiten](https://github.com/sago35/koebiten) | MIT |
+| [tinygo.org/x/drivers](https://github.com/tinygo-org/drivers) | BSD-3-Clause |
+
+ゲームの見た目と手触りは既存の恐竜ゲームを参考にしていますが、スプライトもロジックもこのリポジトリで書き起こしたもので、元実装のコードやアセットは含んでいません。MIT が及ぶのはこのリポジトリのコードだけです。
