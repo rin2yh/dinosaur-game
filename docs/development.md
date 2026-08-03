@@ -1,14 +1,16 @@
-# 開発環境とタスク
+# 開発環境
 
-## 必要環境
+## ツール
 
-ツールバージョンは [mise](https://mise.jdx.dev/) で管理しています。
+バージョンは [mise](https://mise.jdx.dev/) で管理しています（`mise.toml`）。
 
 ```sh
 mise install
 ```
 
-デスクトップ実行には音声デバイスが必要です（Ebitengine は音声の初期化失敗をゲームのエラーとして返すため、鳴らせない環境では起動できません）。ビルドに追加パッケージが要るかどうかは OS によります。
+## OS ごとの前提
+
+デスクトップ実行には音声デバイスが必要です。Ebitengine は音声の初期化失敗をゲームのエラーとして返すため、鳴らせない環境では起動できません。
 
 | OS | 追加で必要なもの |
 | --- | --- |
@@ -20,19 +22,12 @@ Web (WASM) ビルドとファームウェアビルドはどの OS でも不要�
 
 ## タスク
 
-```sh
-mise run run            # デスクトップで実行
-mise run build-web      # web/ に WASM をビルド
-mise run serve          # wasmserve で http://localhost:8000 に配信（リロードで再ビルド）
-mise run check          # fmt + vet + test + ファームウェアビルド
-mise run build-firmware # zero-kb02 向け UF2 を bin/ にビルド（TinyGo）
-mise run flash-firmware # zero-kb02 に書き込み
-```
-
-タスクの一覧と説明は `mise tasks` で確認できます。
+`mise tasks` で一覧と説明が出ます。定義は `mise.toml`。
 
 ## デプロイ
 
-`main` への push で `.github/workflows/deploy-pages.yml` が WASM をビルドし、`web/` を GitHub Pages に公開します（手動実行も可）。初回のみリポジトリの Settings → Pages → Build and deployment の Source を「GitHub Actions」にしてください。
+`main` への push で WASM をビルドし、`web/` を GitHub Pages に公開します（手動実行も可）。定義は `.github/workflows/deploy-pages.yml`。
+
+初回のみリポジトリの Settings → Pages → Build and deployment の Source を「GitHub Actions」にする必要があります。
 
 公開先: https://rin2yh.github.io/dinosaur-game/

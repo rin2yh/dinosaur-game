@@ -10,33 +10,28 @@
 - **長押しで高く跳ぶ**。離すと上昇が打ち切られるので、小サボテンはチョン押し、大サボテンや3連は長押し
 - サボテンを飛び越え、低い鳥は飛び越え、高い鳥はくぐる（ジャンプすると当たる）
 
-進むほど速くなり、スコアに応じて新しい障害物が解禁されます。詳しくは [ゲーム仕様](docs/gameplay.md) を参照してください。
-
 ## 動かす
 
-ツールバージョンは [mise](https://mise.jdx.dev/) で管理しています。
-
 ```sh
-mise install
-mise run run     # デスクトップで実行
-mise run serve   # http://localhost:8000 に Web 版を配信
-mise run check   # fmt + vet + test + ファームウェアビルド
+mise install                  # ツールを揃える（mise.toml）
+go run ./cmd/dinosaur-game    # デスクトップで実行
+mise run serve                # http://localhost:8000 に Web 版を配信
 ```
 
-Linux でデスクトップ実行する場合は ALSA のヘッダが必要です。その他のタスクや OS ごとの前提は [開発環境とタスク](docs/development.md) にまとめています。
+タスクの一覧は `mise tasks`。Linux でデスクトップ実行する場合は ALSA のヘッダが要ります → [開発環境](docs/development.md)
 
 ## 構成
 
-ゲーム本体 (`game/`) はエンジン非依存で、Ebitengine（デスクトップ・WASM）と [koebiten](https://github.com/sago35/koebiten)（マイコン実機）の 2 つのフロントエンドが `cmd/` にあります。詳しくは [構成と移植性](docs/architecture.md) を参照してください。
+ゲーム本体 (`game/`) はエンジン非依存で、フロントエンドが `cmd/` に 2 つあります。Ebitengine（デスクトップ・WASM）と [koebiten](https://github.com/sago35/koebiten)（マイコン実機）です。→ [構成と移植性](docs/architecture.md)
 
 ## ドキュメント
 
-- [ゲーム仕様](docs/gameplay.md) — 操作、速度カーブ、障害物の出現、ナイトモード
-- [効果音](docs/sound.md) — サイン波から生成している 3 種類の SE
-- [開発環境とタスク](docs/development.md) — 必要環境、mise タスク、GitHub Pages へのデプロイ
-- [構成と移植性](docs/architecture.md) — ディレクトリ構成、`game` パッケージの前提、ファームウェア
+- [ゲーム仕様](docs/gameplay.md) — 難易度の上げ方、障害物の出現間隔の考え方
+- [効果音](docs/sound.md) — サイン波から生成している理由と、生成・再生の担当箇所
+- [開発環境](docs/development.md) — OS ごとの前提、タスク、デプロイ
+- [構成と移植性](docs/architecture.md) — `game` パッケージの制約と理由、ファームウェア固有の調整
 - [ライセンス](docs/licenses.md) — 依存ライブラリのライセンス
 
 ## ライセンス
 
-[MIT License](LICENSE) です。依存ライブラリの内訳は [ライセンス](docs/licenses.md) にあります。
+[MIT License](LICENSE) です。依存の内訳は [ライセンス](docs/licenses.md) にあります。
